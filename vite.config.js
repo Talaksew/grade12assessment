@@ -24,5 +24,5 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: '/Grade12Assesment/', // Must match your GitHub repository name exactly
+  base: '/grade12assesment/', // Must match your GitHub repository name exactly
 })
