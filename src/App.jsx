@@ -1,24 +1,33 @@
 import React, { useState, useEffect } from 'react';
 
 // REPLACE WITH YOUR GOOGLE APPS SCRIPT WEB APP EXEC URL
-const API_URL = "https://script.google.com/macros/s/AKfycbzONdeq_GMFV6a4lA-ohv7bm60TKHeAnA1i0J38X7r_Dqs6Ub9u_EqyCXTCmqQh38ubnw/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbw6DbpPH9rMMffZDHf_uKvXk6m1fgypi6Qq7WfQXpwYuob7ZTsHygl3_lcBKD2b93pLjQ/exec";
 
 export default function App() {
   const [data, setData] = useState({ activeMode: '', tasks: [] });
+  const [studentName, setStudentName] = useState('');
+  const [isNameSet, setIsNameSet] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState(null);
   const [codeSubmission, setCodeSubmission] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitted, setSubmitted] = useState(false);
 
-  // Initialize Telegram SDK
+  // Initialize Telegram WebApp SDK
   const tg = window.Telegram?.WebApp;
-  const user = tg?.initDataUnsafe?.user || { id: "12345", first_name: "Test", last_name: "Student" };
+  const tgUser = tg?.initDataUnsafe?.user;
 
   useEffect(() => {
     if (tg) {
       tg.ready();
       tg.expand();
+    }
+
+    // Auto-fill student name if available via Telegram
+    if (tgUser && tgUser.first_name) {
+      const fullName = `${tgUser.first_name} ${tgUser.last_name || ''}`.trim();
+      setStudentName(fullName);
+      setIsNameSet(true);
     }
 
     fetch(API_URL)
@@ -37,9 +46,10 @@ export default function App() {
 
   const handleSubmit = (submissionValue, score = null) => {
     setLoading(true);
+    
     const payload = {
-      userId: user.id,
-      userName: `${user.first_name} ${user.last_name || ''}`.trim(),
+      userId: tgUser?.id ? String(tgUser.id) : "Web_User",
+      userName: studentName || "Anonymous Student",
       taskType: data.activeMode,
       topic: currentTask?.topic || "General",
       submission: submissionValue,
@@ -54,7 +64,16 @@ export default function App() {
     })
       .then(() => {
         setLoading(false);
-        setSubmitted(true);
+        setSelectedOption(null);
+        setCodeSubmission('');
+
+        // If there are more questions, go to the next question
+        if (currentIndex + 1 < data.tasks.length) {
+          setCurrentIndex((prev) => prev + 1);
+        } else {
+          // All questions finished
+          setSubmitted(true);
+        }
       })
       .catch((err) => {
         console.error("Submission Error:", err);
@@ -62,6 +81,7 @@ export default function App() {
       });
   };
 
+  // 1. Loading Screen
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center bg-gray-50">
@@ -71,26 +91,58 @@ export default function App() {
     );
   }
 
+  // 2. Student Name Registration Screen (If opening via Web / Browser)
+  if (!isNameSet) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-gray-50 max-w-lg mx-auto">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 w-full">
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Welcome to Assessment Portal</h2>
+          <p className="text-sm text-gray-600 mb-4">Please enter your full name before starting:</p>
+          <input
+            type="text"
+            placeholder="e.g. Abebe Kebede"
+            value={studentName}
+            onChange={(e) => setStudentName(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-lg text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            disabled={!studentName.trim()}
+            onClick={() => setIsNameSet(true)}
+            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-sm disabled:opacity-50"
+          >
+            Start Assessment
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Final Submission Complete Screen
   if (submitted) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-gray-50">
         <div className="bg-green-100 text-green-700 w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl font-bold">
           ✓
         </div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Submission Successful!</h2>
-        <p className="text-gray-600">Your grade and work have been logged to the classroom master sheet.</p>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">All Tasks Completed!</h2>
+        <p className="text-gray-600">Great job, {studentName}! Your answers have been recorded in the gradebook.</p>
       </div>
     );
   }
 
+  // 4. Empty Task Guard
   if (!data.tasks || data.tasks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-gray-50">
         <h2 className="text-xl font-bold text-gray-700">No Active Tasks</h2>
-        <p className="text-gray-500 mt-2">There are no items currently assigned for mode: <strong>{data.activeMode}</strong>.</p>
+        <p className="text-gray-500 mt-2">
+          There are currently no items assigned for mode: <strong>{data.activeMode}</strong>.
+        </p>
       </div>
     );
   }
+
+  const activeModeNormalized = String(data.activeMode).trim().toLowerCase();
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto">
@@ -100,11 +152,12 @@ export default function App() {
           <span className="text-xs font-semibold px-2.5 py-0.5 rounded bg-blue-100 text-blue-800 uppercase">
             {data.activeMode} Mode
           </span>
-          <span className="text-xs text-gray-400">
+          <span className="text-xs font-medium text-gray-500">
             Task {currentIndex + 1} of {data.tasks.length}
           </span>
         </div>
         <h1 className="text-lg font-bold text-gray-800">{currentTask.topic}</h1>
+        <small className="text-xs text-gray-400">Student: {studentName}</small>
       </header>
 
       {/* Task Card */}
@@ -113,8 +166,8 @@ export default function App() {
           {currentTask.prompt}
         </p>
 
-        {/* QUIZ & HOMEWORK MODE (Multiple Choice) */}
-        {(data.activeMode === 'Quiz' || data.activeMode === 'Homework') && (
+        {/* QUIZ / HOMEWORK MODE (Multiple Choice) */}
+        {(activeModeNormalized === 'quiz' || activeModeNormalized === 'homework') && (
           <div className="space-y-3">
             {currentTask.options.map((opt, idx) => (
               <button
@@ -138,13 +191,13 @@ export default function App() {
               }}
               className="w-full mt-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm disabled:opacity-50 transition-all"
             >
-              Submit Answer
+              {currentIndex + 1 < data.tasks.length ? "Submit & Next Question →" : "Submit & Finish Quiz"}
             </button>
           </div>
         )}
 
         {/* ASSIGNMENT MODE (HTML/CSS Code Editor) */}
-        {data.activeMode === 'Assignment' && (
+        {activeModeNormalized === 'assignment' && (
           <div className="space-y-4">
             <textarea
               rows="8"
@@ -159,7 +212,7 @@ export default function App() {
               onClick={() => handleSubmit(codeSubmission)}
               className="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-sm disabled:opacity-50 transition-all"
             >
-              Submit Assignment
+              {currentIndex + 1 < data.tasks.length ? "Submit & Next Task →" : "Submit Assignment"}
             </button>
           </div>
         )}
