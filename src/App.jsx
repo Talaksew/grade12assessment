@@ -1,59 +1,97 @@
 import React, { useState, useEffect } from 'react';
 
 // REPLACE WITH YOUR GOOGLE APPS SCRIPT WEB APP EXEC URL
-const API_URL = "https://script.google.com/macros/s/AKfycbztZ-yAk4q5NF_O7Te8HkHjM2Kscje8luvIrr7Pwaqm0_HvRuDfEM5p0m_A-nGQnwBpYA/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxkGcQckJY3X7XP6mrZ9lwMBP0Avw_Da9RImBKA_Xh-Qgi-JDisEH7ZUR3uJlt9alrOdA/exec";
 
 export default function App() {
-  const [data, setData] = useState({ activeMode: '', tasks: [] });
+  const [allTasks, setAllTasks] = useState([]);
+  const [studentStats, setStudentStats] = useState(null);
+  const [activeTab, setActiveTab] = useState('Quiz'); // Quiz, Assignment, Homework, Missing, Portal
+  const [selectedTask, setSelectedTask] = useState(null);
   const [studentName, setStudentName] = useState('');
   const [isNameSet, setIsNameSet] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState(null);
   const [codeSubmission, setCodeSubmission] = useState('');
+  const [fileData, setFileData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [submitted, setSubmitted] = useState(false);
 
-  // Initialize Telegram WebApp SDK
   const tg = window.Telegram?.WebApp;
   const tgUser = tg?.initDataUnsafe?.user;
+  const userId = tgUser?.id ? String(tgUser.id) : "Web_User";
+
+  const fetchTasksAndStats = () => {
+    setLoading(true);
+    fetch(`${API_URL}?userId=${encodeURIComponent(userId)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setAllTasks(data.tasks || []);
+        setStudentStats(data.studentStats || null);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("API Fetch Error:", err);
+        setLoading(false);
+      });
+  };
 
   useEffect(() => {
     if (tg) {
       tg.ready();
       tg.expand();
     }
-
-    // Auto-fill student name if available via Telegram
     if (tgUser && tgUser.first_name) {
-      const fullName = `${tgUser.first_name} ${tgUser.last_name || ''}`.trim();
-      setStudentName(fullName);
+      setStudentName(`${tgUser.first_name} ${tgUser.last_name || ''}`.trim());
       setIsNameSet(true);
     }
-
-    fetch(API_URL)
-      .then((res) => res.json())
-      .then((resData) => {
-        setData(resData);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("API Error:", err);
-        setLoading(false);
-      });
+    fetchTasksAndStats();
   }, []);
 
-  const currentTask = data.tasks && data.tasks[currentIndex];
+  // Save drafts locally
+  useEffect(() => {
+    if (selectedTask) {
+      const savedCode = localStorage.getItem(`draft_${selectedTask.taskId}`);
+      if (savedCode) setCodeSubmission(savedCode);
+    }
+  }, [selectedTask]);
 
-  const handleSubmit = (submissionValue, score = null) => {
+  const handleCodeChange = (val) => {
+    setCodeSubmission(val);
+    if (selectedTask) localStorage.setItem(`draft_${selectedTask.taskId}`, val);
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File limit is 10MB!");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFileData({ fileName: file.name, mimeType: file.type, fileBase64: reader.result });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = () => {
+    if (!selectedTask) return;
     setLoading(true);
-    
+
+    const isQuiz = selectedTask.type.toLowerCase() === 'quiz';
+    const isCorrect = selectedOption === selectedTask.correctIndex;
+    const score = isQuiz ? (isCorrect ? 100 : 0) : null;
+    const submissionVal = isQuiz ? `Selected Option: ${selectedOption}` : codeSubmission;
+
     const payload = {
-      userId: tgUser?.id ? String(tgUser.id) : "Web_User",
+      userId: userId,
       userName: studentName || "Anonymous Student",
-      taskType: data.activeMode,
-      topic: currentTask?.topic || "General",
-      submission: submissionValue,
-      score: score
+      taskId: selectedTask.taskId,
+      taskType: selectedTask.type,
+      submission: submissionVal,
+      score: score,
+      fileBase64: fileData ? fileData.fileBase64 : null,
+      fileName: fileData ? fileData.fileName : null,
+      mimeType: fileData ? fileData.mimeType : null
     };
 
     fetch(API_URL, {
@@ -63,17 +101,12 @@ export default function App() {
       body: JSON.stringify(payload)
     })
       .then(() => {
-        setLoading(false);
-        setSelectedOption(null);
+        if (selectedTask) localStorage.removeItem(`draft_${selectedTask.taskId}`);
+        setFileData(null);
         setCodeSubmission('');
-
-        // If there are more questions, go to the next question
-        if (currentIndex + 1 < data.tasks.length) {
-          setCurrentIndex((prev) => prev + 1);
-        } else {
-          // All questions finished
-          setSubmitted(true);
-        }
+        setSelectedOption(null);
+        setSelectedTask(null);
+        fetchTasksAndStats();
       })
       .catch((err) => {
         console.error("Submission Error:", err);
@@ -81,142 +114,253 @@ export default function App() {
       });
   };
 
-  // 1. Loading Screen
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center bg-gray-50">
-        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-gray-600 font-medium">Loading Assessment Data...</p>
-      </div>
-    );
-  }
+  // Automated HTML/CSS Validation
+  const validateCode = (code) => {
+    const checks = [];
+    if (!code.includes('<') || !code.includes('>')) checks.push("Missing HTML tags.");
+    if (selectedTask?.prompt.toLowerCase().includes("flex") && !code.includes("flex")) {
+      checks.push("Task mentions Flexbox, but 'flex' property was not found in CSS.");
+    }
+    return checks;
+  };
 
-  // 2. Student Name Registration Screen (If opening via Web / Browser)
   if (!isNameSet) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-gray-50 max-w-lg mx-auto">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 w-full">
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Welcome to Assessment Portal</h2>
-          <p className="text-sm text-gray-600 mb-4">Please enter your full name before starting:</p>
+      <div className="flex items-center justify-center min-h-screen p-6 bg-gray-50">
+        <div className="bg-white p-6 rounded-xl shadow-sm border w-full max-w-sm">
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Grade 12 Web Portal</h2>
+          <p className="text-xs text-gray-600 mb-4">Enter your full name to start:</p>
           <input
             type="text"
             placeholder="e.g. Abebe Kebede"
             value={studentName}
             onChange={(e) => setStudentName(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-lg text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full p-3 border rounded-lg text-sm mb-4 focus:ring-2 focus:ring-blue-500 outline-none"
           />
           <button
             disabled={!studentName.trim()}
             onClick={() => setIsNameSet(true)}
-            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-sm disabled:opacity-50"
+            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg disabled:opacity-50"
           >
-            Start Assessment
+            Enter Portal
           </button>
         </div>
       </div>
     );
   }
 
-  // 3. Final Submission Complete Screen
-  if (submitted) {
+  if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-gray-50">
-        <div className="bg-green-100 text-green-700 w-16 h-16 rounded-full flex items-center justify-center mb-4 text-3xl font-bold">
-          ✓
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-center">
+        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-xs font-medium text-gray-600">Connecting to Assessment Server...</p>
+      </div>
+    );
+  }
+
+  // Selected Task Detail Screen
+  if (selectedTask) {
+    const codeWarnings = selectedTask.type.toLowerCase() === 'assignment' ? validateCode(codeSubmission) : [];
+
+    return (
+      <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto">
+        <button
+          onClick={() => setSelectedTask(null)}
+          className="text-xs text-blue-600 font-bold mb-4 inline-block"
+        >
+          ← Back to Task Dashboard
+        </button>
+
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+          <span className="text-xs font-semibold px-2.5 py-0.5 rounded bg-blue-100 text-blue-800 uppercase">
+            {selectedTask.type} • {selectedTask.topic}
+          </span>
+          <h2 className="text-lg font-bold text-gray-800 mt-2 mb-4">{selectedTask.prompt}</h2>
+
+          {selectedTask.status === "COMPLETED" ? (
+            <div className="bg-green-50 border border-green-200 p-4 rounded-lg text-center">
+              <span className="text-2xl">✓</span>
+              <h3 className="font-bold text-green-800 mt-1">Already Submitted</h3>
+              <p className="text-xs text-green-700 mt-1">
+                {selectedTask.previousSubmission
+                  ? `Logged Record: ${selectedTask.previousSubmission.submission}`
+                  : "Your response is securely stored in the gradebook."}
+              </p>
+            </div>
+          ) : (
+            <div>
+              {(selectedTask.type.toLowerCase() === 'quiz' || selectedTask.type.toLowerCase() === 'homework') && (
+                <div className="space-y-2">
+                  {selectedTask.options.map((opt, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedOption(idx)}
+                      className={`w-full p-3 text-left rounded-lg border text-sm ${
+                        selectedOption === idx ? 'border-blue-500 bg-blue-50 font-medium' : 'border-gray-200'
+                      }`}
+                    >
+                      <span className="font-bold mr-2">{String.fromCharCode(65 + idx)}.</span> {opt}
+                    </button>
+                  ))}
+                  <button
+                    disabled={selectedOption === null}
+                    onClick={handleSubmit}
+                    className="w-full mt-4 py-3 bg-blue-600 text-white font-semibold rounded-lg disabled:opacity-50"
+                  >
+                    Submit Response
+                  </button>
+                </div>
+              )}
+
+              {selectedTask.type.toLowerCase() === 'assignment' && (
+                <div className="space-y-3">
+                  {selectedTask.assignmentType === 'code' ? (
+                    <div>
+                      <textarea
+                        rows="8"
+                        value={codeSubmission}
+                        onChange={(e) => handleCodeChange(e.target.value)}
+                        placeholder="<!-- Write or paste your HTML/CSS code snippet here -->"
+                        className="w-full p-3 font-mono text-xs bg-gray-900 text-green-400 rounded-lg border focus:outline-none"
+                      />
+                      {codeWarnings.map((w, i) => (
+                        <p key={i} className="text-xs text-amber-600 font-semibold mt-1">⚠️ {w}</p>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-gray-300 p-4 rounded-lg text-center">
+                      <input
+                        type="file"
+                        accept={selectedTask.assignmentType === 'pdf' ? '.pdf' : 'image/*'}
+                        onChange={handleFileUpload}
+                        className="text-xs"
+                      />
+                      {fileData && <p className="text-xs text-green-600 mt-2 font-bold">Selected: {fileData.fileName}</p>}
+                    </div>
+                  )}
+
+                  <button
+                    disabled={!codeSubmission.trim() && !fileData}
+                    onClick={handleSubmit}
+                    className="w-full py-3 bg-green-600 text-white font-semibold rounded-lg disabled:opacity-50"
+                  >
+                    Submit Assignment
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">All Tasks Completed!</h2>
-        <p className="text-gray-600">Great job, {studentName}! Your answers have been recorded in the gradebook.</p>
       </div>
     );
   }
 
-  // 4. Empty Task Guard
-  if (!data.tasks || data.tasks.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-gray-50">
-        <h2 className="text-xl font-bold text-gray-700">No Active Tasks</h2>
-        <p className="text-gray-500 mt-2">
-          There are currently no items assigned for mode: <strong>{data.activeMode}</strong>.
-        </p>
-      </div>
-    );
-  }
-
-  const activeModeNormalized = String(data.activeMode).trim().toLowerCase();
+  // Task Filter Logic
+  const filteredTasks = allTasks.filter((t) => {
+    if (activeTab === 'Missing') return t.status === 'MISSING';
+    return t.type.toLowerCase() === activeTab.toLowerCase();
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto">
-      {/* Header Banner */}
-      <header className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-4">
-        <div className="flex justify-between items-center mb-1">
-          <span className="text-xs font-semibold px-2.5 py-0.5 rounded bg-blue-100 text-blue-800 uppercase">
-            {data.activeMode} Mode
-          </span>
-          <span className="text-xs font-medium text-gray-500">
-            Task {currentIndex + 1} of {data.tasks.length}
-          </span>
+      <header className="mb-4 flex justify-between items-center">
+        <div>
+          <h1 className="text-xl font-bold text-gray-800">Grade 12 Portal</h1>
+          <p className="text-xs text-gray-500">Student: {studentName}</p>
         </div>
-        <h1 className="text-lg font-bold text-gray-800">{currentTask.topic}</h1>
-        <small className="text-xs text-gray-400">Student: {studentName}</small>
+        {studentStats && (
+          <div className="text-right">
+            <span className="text-xs text-gray-400 block">Total Grade</span>
+            <span className="text-base font-extrabold text-blue-600">{studentStats.totalScore}%</span>
+          </div>
+        )}
       </header>
 
-      {/* Task Card */}
-      <main className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-        <p className="text-gray-800 font-medium mb-6 text-base leading-relaxed">
-          {currentTask.prompt}
-        </p>
+      {/* Navigation Tabs */}
+      <div className="flex bg-gray-200 p-1 rounded-xl mb-4 text-[11px] font-semibold overflow-x-auto">
+        {['Quiz', 'Assignment', 'Homework', 'Missing', 'Portal'].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 py-2 px-1 text-center rounded-lg transition-all whitespace-nowrap ${
+              activeTab === tab ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600'
+            }`}
+          >
+            {tab === 'Portal' ? '🎓 My Grades' : tab === 'Missing' ? '⚠️ Missing' : `${tab}s`}
+          </button>
+        ))}
+      </div>
 
-        {/* QUIZ / HOMEWORK MODE (Multiple Choice) */}
-        {(activeModeNormalized === 'quiz' || activeModeNormalized === 'homework') && (
-          <div className="space-y-3">
-            {currentTask.options.map((opt, idx) => (
-              <button
-                key={idx}
-                onClick={() => setSelectedOption(idx)}
-                className={`w-full p-3.5 text-left rounded-lg border text-sm transition-all ${
-                  selectedOption === idx
-                    ? 'border-blue-500 bg-blue-50 text-blue-900 font-medium'
-                    : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
-                }`}
+      {/* Student Portal Gradebook Screen */}
+      {activeTab === 'Portal' ? (
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 space-y-4">
+          <h2 className="text-base font-bold text-gray-800">Academic Summary</h2>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+              <span className="text-[10px] text-blue-600 block uppercase font-bold">Quizzes (30%)</span>
+              <span className="text-lg font-bold text-blue-900">{studentStats?.quizAvg}%</span>
+            </div>
+            <div className="bg-green-50 p-3 rounded-lg border border-green-100">
+              <span className="text-[10px] text-green-600 block uppercase font-bold">Assign. (50%)</span>
+              <span className="text-lg font-bold text-green-900">{studentStats?.assignmentAvg}%</span>
+            </div>
+            <div className="bg-purple-50 p-3 rounded-lg border border-purple-100">
+              <span className="text-[10px] text-purple-600 block uppercase font-bold">H/W (20%)</span>
+              <span className="text-lg font-bold text-purple-900">{studentStats?.homeworkAvg}%</span>
+            </div>
+          </div>
+
+          <h3 className="text-xs font-bold text-gray-700 pt-2">Submission Log History</h3>
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {studentStats?.history.length === 0 ? (
+              <p className="text-xs text-gray-400">No submissions recorded yet.</p>
+            ) : (
+              studentStats?.history.map((h, i) => (
+                <div key={i} className="flex justify-between items-center text-xs p-2 bg-gray-50 rounded border">
+                  <div>
+                    <span className="font-bold text-gray-700 block">{h.taskId} ({h.type})</span>
+                    <span className="text-[10px] text-gray-400">{new Date(h.date).toLocaleDateString()}</span>
+                  </div>
+                  <span className="font-bold text-blue-600">{h.score !== null ? `${h.score}%` : 'Submitted'}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Task Dashboard */
+        <div className="space-y-3">
+          {filteredTasks.length === 0 ? (
+            <p className="text-center text-xs text-gray-500 py-8">No {activeTab.toLowerCase()} tasks found.</p>
+          ) : (
+            filteredTasks.map((t) => (
+              <div
+                key={t.taskId}
+                onClick={() => setSelectedTask(t)}
+                className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 cursor-pointer flex justify-between items-center hover:border-blue-300"
               >
-                <span className="font-bold mr-2">{String.fromCharCode(65 + idx)}.</span> {opt}
-              </button>
-            ))}
-
-            <button
-              disabled={selectedOption === null}
-              onClick={() => {
-                const isCorrect = selectedOption === currentTask.correctIndex;
-                handleSubmit(`Option: ${selectedOption}`, isCorrect ? 100 : 0);
-              }}
-              className="w-full mt-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm disabled:opacity-50 transition-all"
-            >
-              {currentIndex + 1 < data.tasks.length ? "Submit & Next Question →" : "Submit & Finish Quiz"}
-            </button>
-          </div>
-        )}
-
-        {/* ASSIGNMENT MODE (HTML/CSS Code Editor) */}
-        {activeModeNormalized === 'assignment' && (
-          <div className="space-y-4">
-            <textarea
-              rows="8"
-              value={codeSubmission}
-              onChange={(e) => setCodeSubmission(e.target.value)}
-              placeholder="<!-- Write or paste your HTML/CSS code snippet here -->"
-              className="w-full p-3 font-mono text-xs bg-gray-900 text-green-400 rounded-lg border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-
-            <button
-              disabled={!codeSubmission.trim()}
-              onClick={() => handleSubmit(codeSubmission)}
-              className="w-full py-3.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-sm disabled:opacity-50 transition-all"
-            >
-              {currentIndex + 1 < data.tasks.length ? "Submit & Next Task →" : "Submit Assignment"}
-            </button>
-          </div>
-        )}
-      </main>
+                <div>
+                  <span className="text-xs font-bold text-gray-700 block">{t.topic}</span>
+                  <span className="text-xs text-gray-400 line-clamp-1">{t.prompt}</span>
+                </div>
+                <span
+                  className={`text-[10px] font-bold px-2 py-1 rounded ${
+                    t.status === 'COMPLETED'
+                      ? 'bg-green-100 text-green-800'
+                      : t.status === 'MISSING'
+                      ? 'bg-red-100 text-red-800'
+                      : t.status === 'UPCOMING'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-blue-100 text-blue-800'
+                  }`}
+                >
+                  {t.status}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
