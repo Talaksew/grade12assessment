@@ -1,15 +1,22 @@
 import React, { useState, useEffect } from 'react';
 
-// REPLACE WITH YOUR GOOGLE APPS SCRIPT WEB APP EXEC URL
-const API_URL = "https://script.google.com/macros/s/AKfycbxkGcQckJY3X7XP6mrZ9lwMBP0Avw_Da9RImBKA_Xh-Qgi-JDisEH7ZUR3uJlt9alrOdA/exec";
+// REPLACE WITH YOUR PUBLISHED GOOGLE APPS SCRIPT WEB APP EXEC URL
+const API_URL = "https://script.google.com/macros/s/YOUR_EXEC_ID_HERE/exec";
 
 export default function App() {
   const [allTasks, setAllTasks] = useState([]);
+  const [rosterList, setRosterList] = useState([]);
   const [studentStats, setStudentStats] = useState(null);
+  
+  // Navigation & Session States
   const [activeTab, setActiveTab] = useState('Quiz'); // Quiz, Assignment, Homework, Missing, Portal
   const [selectedTask, setSelectedTask] = useState(null);
   const [studentName, setStudentName] = useState('');
   const [isNameSet, setIsNameSet] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStudent, setSelectedStudent] = useState(null);
+
+  // Form Inputs
   const [selectedOption, setSelectedOption] = useState(null);
   const [codeSubmission, setCodeSubmission] = useState('');
   const [fileData, setFileData] = useState(null);
@@ -19,12 +26,27 @@ export default function App() {
   const tgUser = tg?.initDataUnsafe?.user;
   const userId = tgUser?.id ? String(tgUser.id) : "Web_User";
 
-  const fetchTasksAndStats = () => {
+  // Load saved session if returning on same device
+  useEffect(() => {
+    const savedName = localStorage.getItem('portal_student_name');
+    if (savedName) {
+      setStudentName(savedName);
+      setIsNameSet(true);
+    }
+  }, []);
+
+  const fetchTasksAndStats = (nameToQuery) => {
     setLoading(true);
-    fetch(`${API_URL}?userId=${encodeURIComponent(userId)}`)
+    const targetName = nameToQuery || studentName;
+    const url = targetName 
+      ? `${API_URL}?studentName=${encodeURIComponent(targetName)}`
+      : API_URL;
+
+    fetch(url)
       .then((res) => res.json())
       .then((data) => {
         setAllTasks(data.tasks || []);
+        setRosterList(data.rosterList || []);
         setStudentStats(data.studentStats || null);
         setLoading(false);
       })
@@ -39,14 +61,10 @@ export default function App() {
       tg.ready();
       tg.expand();
     }
-    if (tgUser && tgUser.first_name) {
-      setStudentName(`${tgUser.first_name} ${tgUser.last_name || ''}`.trim());
-      setIsNameSet(true);
-    }
     fetchTasksAndStats();
-  }, []);
+  }, [isNameSet]);
 
-  // Save drafts locally
+  // Draft local storage
   useEffect(() => {
     if (selectedTask) {
       const savedCode = localStorage.getItem(`draft_${selectedTask.taskId}`);
@@ -63,7 +81,7 @@ export default function App() {
     const file = e.target.files[0];
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) {
-      alert("File limit is 10MB!");
+      alert("File size limit is 10MB!");
       return;
     }
     const reader = new FileReader();
@@ -84,7 +102,7 @@ export default function App() {
 
     const payload = {
       userId: userId,
-      userName: studentName || "Anonymous Student",
+      userName: studentName,
       taskId: selectedTask.taskId,
       taskType: selectedTask.type,
       submission: submissionVal,
@@ -106,7 +124,7 @@ export default function App() {
         setCodeSubmission('');
         setSelectedOption(null);
         setSelectedTask(null);
-        fetchTasksAndStats();
+        fetchTasksAndStats(studentName);
       })
       .catch((err) => {
         console.error("Submission Error:", err);
@@ -114,7 +132,7 @@ export default function App() {
       });
   };
 
-  // Automated HTML/CSS Validation
+  // Client-Side Syntax Check for Assignments
   const validateCode = (code) => {
     const checks = [];
     if (!code.includes('<') || !code.includes('>')) checks.push("Missing HTML tags.");
@@ -124,25 +142,72 @@ export default function App() {
     return checks;
   };
 
+  // 1. Session Onboarding (Search Roster Autocomplete)
   if (!isNameSet) {
+    const filteredRoster = searchQuery.trim() === ''
+      ? []
+      : rosterList.filter(student =>
+          student.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
     return (
       <div className="flex items-center justify-center min-h-screen p-6 bg-gray-50">
         <div className="bg-white p-6 rounded-xl shadow-sm border w-full max-w-sm">
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Grade 12 Web Portal</h2>
-          <p className="text-xs text-gray-600 mb-4">Enter your full name to start:</p>
-          <input
-            type="text"
-            placeholder="e.g. Abebe Kebede"
-            value={studentName}
-            onChange={(e) => setStudentName(e.target.value)}
-            className="w-full p-3 border rounded-lg text-sm mb-4 focus:ring-2 focus:ring-blue-500 outline-none"
-          />
+          <h2 className="text-lg font-bold text-gray-800 mb-1">Grade 12 Portal Login</h2>
+          <p className="text-xs text-gray-500 mb-4">Search and select your official name to begin:</p>
+
+          <div className="relative mb-3">
+            <input
+              type="text"
+              placeholder="Type your name (e.g. Abebe)..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSelectedStudent(null);
+              }}
+              className="w-full p-3 border rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+
+          {filteredRoster.length > 0 && !selectedStudent && (
+            <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg bg-white mb-4 shadow-inner divide-y">
+              {filteredRoster.map((st, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setSelectedStudent(st);
+                    setSearchQuery(st.name);
+                  }}
+                  className="w-full p-3 text-left text-xs flex justify-between items-center hover:bg-blue-50 text-gray-800 transition-colors cursor-pointer"
+                >
+                  <span className="font-medium">{st.name}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-blue-100 text-blue-800">
+                    Section {st.section}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {selectedStudent && (
+            <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg mb-4 text-xs">
+              <span className="text-gray-500 block text-[10px] uppercase font-bold">Selected Student:</span>
+              <span className="font-bold text-blue-900 text-sm block">{selectedStudent.name}</span>
+              <span className="text-blue-700">Section: {selectedStudent.section}</span>
+            </div>
+          )}
+
           <button
-            disabled={!studentName.trim()}
-            onClick={() => setIsNameSet(true)}
-            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg disabled:opacity-50"
+            disabled={!selectedStudent}
+            onClick={() => {
+              setStudentName(selectedStudent.name);
+              setIsNameSet(true);
+              localStorage.setItem('portal_student_name', selectedStudent.name);
+              fetchTasksAndStats(selectedStudent.name);
+            }}
+            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg text-sm disabled:opacity-50"
           >
-            Enter Portal
+            Continue as {selectedStudent ? selectedStudent.name.split(' ')[0] : 'Student'}
           </button>
         </div>
       </div>
@@ -153,12 +218,12 @@ export default function App() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-center">
         <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-xs font-medium text-gray-600">Connecting to Assessment Server...</p>
+        <p className="text-xs font-medium text-gray-600">Loading Assessment Portal...</p>
       </div>
     );
   }
 
-  // Selected Task Detail Screen
+  // 2. Selected Task Screen
   if (selectedTask) {
     const codeWarnings = selectedTask.type.toLowerCase() === 'assignment' ? validateCode(codeSubmission) : [];
 
@@ -255,18 +320,32 @@ export default function App() {
     );
   }
 
-  // Task Filter Logic
+  // Task Filter
   const filteredTasks = allTasks.filter((t) => {
     if (activeTab === 'Missing') return t.status === 'MISSING';
     return t.type.toLowerCase() === activeTab.toLowerCase();
   });
 
+  // 3. Main Dashboard UI
   return (
     <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto">
       <header className="mb-4 flex justify-between items-center">
         <div>
           <h1 className="text-xl font-bold text-gray-800">Grade 12 Portal</h1>
-          <p className="text-xs text-gray-500">Student: {studentName}</p>
+          <p className="text-xs text-gray-500">
+            Student: <span className="font-bold text-gray-700">{studentName}</span>{' '}
+            <button
+              onClick={() => {
+                setIsNameSet(false);
+                setSelectedStudent(null);
+                setSearchQuery('');
+                localStorage.removeItem('portal_student_name');
+              }}
+              className="text-[10px] text-blue-600 underline ml-1"
+            >
+              (Switch)
+            </button>
+          </p>
         </div>
         {studentStats && (
           <div className="text-right">
@@ -291,7 +370,7 @@ export default function App() {
         ))}
       </div>
 
-      {/* Student Portal Gradebook Screen */}
+      {/* Student Portal Screen */}
       {activeTab === 'Portal' ? (
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 space-y-4">
           <h2 className="text-base font-bold text-gray-800">Academic Summary</h2>
@@ -310,7 +389,7 @@ export default function App() {
             </div>
           </div>
 
-          <h3 className="text-xs font-bold text-gray-700 pt-2">Submission Log History</h3>
+          <h3 className="text-xs font-bold text-gray-700 pt-2">Submission History</h3>
           <div className="space-y-2 max-h-60 overflow-y-auto">
             {studentStats?.history.length === 0 ? (
               <p className="text-xs text-gray-400">No submissions recorded yet.</p>
@@ -328,7 +407,7 @@ export default function App() {
           </div>
         </div>
       ) : (
-        /* Task Dashboard */
+        /* Task List View */
         <div className="space-y-3">
           {filteredTasks.length === 0 ? (
             <p className="text-center text-xs text-gray-500 py-8">No {activeTab.toLowerCase()} tasks found.</p>
@@ -363,4 +442,5 @@ export default function App() {
       )}
     </div>
   );
-}
+      }
+
