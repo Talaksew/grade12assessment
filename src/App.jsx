@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 // REPLACE WITH YOUR PUBLISHED GOOGLE APPS SCRIPT WEB APP EXEC URL
 const API_URL = "https://script.google.com/macros/s/AKfycbxL938suJ_y69vkVJc1UV_TfE6expOM8zw-OPeZKmFSTc8LvCam3Xpk2vXTnp0tVnZS-A/exec";
+
 export default function App() {
   const [allTasks, setAllTasks] = useState([]);
   const [rosterList, setRosterList] = useState([]);
@@ -97,7 +98,11 @@ export default function App() {
     const isQuiz = selectedTask.type.toLowerCase() === 'quiz';
     const isCorrect = selectedOption === selectedTask.correctIndex;
     const score = isQuiz ? (isCorrect ? 100 : 0) : null;
-    const submissionVal = isQuiz ? `Selected Option: ${selectedOption}` : codeSubmission;
+
+    // Use file name if uploaded, otherwise use code text
+    const submissionVal = isQuiz 
+      ? `Selected Option: ${selectedOption}` 
+      : (fileData ? `Uploaded File: ${fileData.fileName}` : codeSubmission);
 
     const payload = {
       userId: userId,
@@ -276,170 +281,42 @@ export default function App() {
                 </div>
               )}
 
-              {selectedTask.type.toLowerCase() === 'assignment' && (
-                <div className="space-y-3">
-                  {selectedTask.assignmentType === 'code' ? (
-                    <div>
-                      <textarea
-                        rows="8"
-                        value={codeSubmission}
-                        onChange={(e) => handleCodeChange(e.target.value)}
-                        placeholder="<!-- Write or paste your HTML/CSS code snippet here -->"
-                        className="w-full p-3 font-mono text-xs bg-gray-900 text-green-400 rounded-lg border focus:outline-none"
-                      />
-                      {codeWarnings.map((w, i) => (
-                        <p key={i} className="text-xs text-amber-600 font-semibold mt-1">⚠️ {w}</p>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="border-2 border-dashed border-gray-300 p-4 rounded-lg text-center">
-                      <input
-                        type="file"
-                        accept={selectedTask.assignmentType === 'pdf' ? '.pdf' : 'image/*'}
-                        onChange={handleFileUpload}
-                        className="text-xs"
-                      />
-                      {fileData && <p className="text-xs text-green-600 mt-2 font-bold">Selected: {fileData.fileName}</p>}
-                    </div>
-                  )}
+              {selectedTask.type.toLowerCase() === 'assignment' && (() => {
+                const assignType = String(selectedTask.assignmentType || 'code').trim().toLowerCase();
+                const isReadyToSubmit = assignType === 'code' ? codeSubmission.trim().length > 0 : fileData !== null;
 
-                  <button
-                    disabled={!codeSubmission.trim() && !fileData}
-                    onClick={handleSubmit}
-                    className="w-full py-3 bg-green-600 text-white font-semibold rounded-lg disabled:opacity-50"
-                  >
-                    Submit Assignment
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
+                return (
+                  <div className="space-y-3">
+                    {assignType === 'code' ? (
+                      <div>
+                        <textarea
+                          rows="8"
+                          value={codeSubmission}
+                          onChange={(e) => handleCodeChange(e.target.value)}
+                          placeholder="<!-- Write or paste your HTML/CSS code snippet here -->"
+                          className="w-full p-3 font-mono text-xs bg-gray-900 text-green-400 rounded-lg border focus:outline-none"
+                        />
+                        {codeWarnings.map((w, i) => (
+                          <p key={i} className="text-xs text-amber-600 font-semibold mt-1">⚠️ {w}</p>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed border-gray-300 p-6 rounded-lg text-center bg-gray-50">
+                        <input
+                          type="file"
+                          accept={assignType === 'pdf' ? '.pdf' : 'image/*'}
+                          onChange={handleFileUpload}
+                          className="text-xs text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                        {fileData && (
+                          <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-green-800 text-xs font-bold">
+                            ✓ Selected: {fileData.fileName}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-  // Task Filter
-  const filteredTasks = allTasks.filter((t) => {
-    if (activeTab === 'Missing') return t.status === 'MISSING';
-    return t.type.toLowerCase() === activeTab.toLowerCase();
-  });
-
-  // 3. Main Dashboard UI
-  return (
-    <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto">
-      <header className="mb-4 flex justify-between items-center">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">Grade 12 Portal</h1>
-          <p className="text-xs text-gray-500">
-            Student: <span className="font-bold text-gray-700">{studentName}</span>{' '}
-            <button
-              onClick={() => {
-                setIsNameSet(false);
-                setSelectedStudent(null);
-                setSearchQuery('');
-                localStorage.removeItem('portal_student_name');
-              }}
-              className="text-[10px] text-blue-600 underline ml-1"
-            >
-              (Switch)
-            </button>
-          </p>
-        </div>
-        {studentStats && (
-          <div className="text-right">
-            <span className="text-xs text-gray-400 block">Total Grade</span>
-            <span className="text-base font-extrabold text-blue-600">{studentStats.totalScore}%</span>
-          </div>
-        )}
-      </header>
-
-      {/* Navigation Tabs */}
-      <div className="flex bg-gray-200 p-1 rounded-xl mb-4 text-[11px] font-semibold overflow-x-auto">
-        {['Quiz', 'Assignment', 'Homework', 'Missing', 'Portal'].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`flex-1 py-2 px-1 text-center rounded-lg transition-all whitespace-nowrap ${
-              activeTab === tab ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600'
-            }`}
-          >
-            {tab === 'Portal' ? '🎓 My Grades' : tab === 'Missing' ? '⚠️ Missing' : `${tab}s`}
-          </button>
-        ))}
-      </div>
-
-      {/* Student Portal Screen */}
-      {activeTab === 'Portal' ? (
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 space-y-4">
-          <h2 className="text-base font-bold text-gray-800">Academic Summary</h2>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-              <span className="text-[10px] text-blue-600 block uppercase font-bold">Quizzes (30%)</span>
-              <span className="text-lg font-bold text-blue-900">{studentStats?.quizAvg}%</span>
-            </div>
-            <div className="bg-green-50 p-3 rounded-lg border border-green-100">
-              <span className="text-[10px] text-green-600 block uppercase font-bold">Assign. (50%)</span>
-              <span className="text-lg font-bold text-green-900">{studentStats?.assignmentAvg}%</span>
-            </div>
-            <div className="bg-purple-50 p-3 rounded-lg border border-purple-100">
-              <span className="text-[10px] text-purple-600 block uppercase font-bold">H/W (20%)</span>
-              <span className="text-lg font-bold text-purple-900">{studentStats?.homeworkAvg}%</span>
-            </div>
-          </div>
-
-          <h3 className="text-xs font-bold text-gray-700 pt-2">Submission History</h3>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
-            {studentStats?.history.length === 0 ? (
-              <p className="text-xs text-gray-400">No submissions recorded yet.</p>
-            ) : (
-              studentStats?.history.map((h, i) => (
-                <div key={i} className="flex justify-between items-center text-xs p-2 bg-gray-50 rounded border">
-                  <div>
-                    <span className="font-bold text-gray-700 block">{h.taskId} ({h.type})</span>
-                    <span className="text-[10px] text-gray-400">{new Date(h.date).toLocaleDateString()}</span>
-                  </div>
-                  <span className="font-bold text-blue-600">{h.score !== null ? `${h.score}%` : 'Submitted'}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      ) : (
-        /* Task List View */
-        <div className="space-y-3">
-          {filteredTasks.length === 0 ? (
-            <p className="text-center text-xs text-gray-500 py-8">No {activeTab.toLowerCase()} tasks found.</p>
-          ) : (
-            filteredTasks.map((t) => (
-              <div
-                key={t.taskId}
-                onClick={() => setSelectedTask(t)}
-                className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 cursor-pointer flex justify-between items-center hover:border-blue-300"
-              >
-                <div>
-                  <span className="text-xs font-bold text-gray-700 block">{t.topic}</span>
-                  <span className="text-xs text-gray-400 line-clamp-1">{t.prompt}</span>
-                </div>
-                <span
-                  className={`text-[10px] font-bold px-2 py-1 rounded ${
-                    t.status === 'COMPLETED'
-                      ? 'bg-green-100 text-green-800'
-                      : t.status === 'MISSING'
-                      ? 'bg-red-100 text-red-800'
-                      : t.status === 'UPCOMING'
-                      ? 'bg-yellow-100 text-yellow-800'
-                      : 'bg-blue-100 text-blue-800'
-                  }`}
-                >
-                  {t.status}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-      }
-
+                    <button
+                      disabled={!isReadyToSubmit}
+                      onClick={handleSubmit}
+                      className="w-full py-3 bg-green-600 text-white font-semibold rounded-lg disabled:opacity
