@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 // REPLACE WITH YOUR PUBLISHED GOOGLE APPS SCRIPT WEB APP EXEC URL
-const API_URL = "https://script.google.com/macros/s/YOUR_EXEC_ID_HERE/exec";
-
+const API_URL = "https://script.google.com/macros/s/AKfycbxkGcQckJY3X7XP6mrZ9lwMBP0Avw_Da9RImBKA_Xh-Qgi-JDisEH7ZUR3uJlt9alrOdA/exec";
 export default function App() {
   const [allTasks, setAllTasks] = useState([]);
   const [rosterList, setRosterList] = useState([]);
