@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 
 // REPLACE WITH YOUR PUBLISHED GOOGLE APPS SCRIPT WEB APP EXEC URL
-const API_URL = "https://script.google.com/macros/s/AKfycbz1oBMhiNUKkudVeDyZWj5I4LYuMO-tJTJNsQE1PGXEdghypbGUVxeEq9sllDAuXP6gLg/exec";
+const API_URL = "https://script.google.com/macros/library/d/1f3R23CRjB-UnXGMUdCKgJOVwXGv9XE0XigujQ82OyLMKCOaQTQi8Gnit/9";
 
 export default function App() {
   const [allTasks, setAllTasks] = useState([]);
   const [rosterList, setRosterList] = useState([]);
   const [studentStats, setStudentStats] = useState(null);
   
-  // Navigation & Session States
-  const [activeTab, setActiveTab] = useState('Quiz'); // Quiz, ClassWork, Practical, Exam, Assignment, Missing, Portal
+  // Navigation & Session States (Condensed 4-Tab Menu)
+  const [activeTab, setActiveTab] = useState('Tasks'); // 'Tasks', 'Practical', 'Missing', 'Portal'
   const [selectedTask, setSelectedTask] = useState(null);
   const [studentName, setStudentName] = useState('');
   const [isNameSet, setIsNameSet] = useState(false);
@@ -77,7 +77,7 @@ export default function App() {
     
     let submissionVal = textSubmission;
     if (isQuiz) {
-      submissionVal = `Selected Option: ${selectedOption}`;
+      submissionVal = `Selected Option Index: ${selectedOption}`;
     } else {
       if (groupMembers.trim()) {
         submissionVal = `${submissionVal} [Group Members: ${groupMembers.trim()}]`;
@@ -143,7 +143,7 @@ export default function App() {
       body: JSON.stringify(payload)
     })
       .then(() => {
-        alert(`Successfully logged marks for ${selectedNames.length} students!`);
+        alert(`🎉 Marks logged for ${selectedNames.length} students!`);
         setCheckedStudents({});
         setBatchTopic('');
         setLoading(false);
@@ -159,26 +159,32 @@ export default function App() {
     const sectionStudents = rosterList.filter(s => s.section.includes(batchSection));
 
     return (
-      <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto">
+      <div className="min-h-screen bg-slate-900 text-white p-4 max-w-lg mx-auto font-sans">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-base font-bold text-gray-800">⚡ Teacher Batch Grader</h2>
+          <div className="flex items-center space-x-2">
+            <span className="p-2 bg-indigo-600 rounded-lg text-lg">⚡</span>
+            <div>
+              <h2 className="text-base font-bold">Teacher Batch Grader</h2>
+              <p className="text-[10px] text-slate-400">Computer Lab & Attendance Evaluation</p>
+            </div>
+          </div>
           <button 
             onClick={() => setIsTeacherMode(false)}
-            className="text-xs bg-gray-200 px-3 py-1 rounded-lg font-bold text-gray-700"
+            className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg font-bold text-slate-300 border border-slate-700"
           >
-            Exit to Portal
+            Exit
           </button>
         </div>
 
-        <div className="bg-white p-4 rounded-xl shadow-sm border space-y-3 mb-4 text-xs">
+        <div className="bg-slate-800/80 p-4 rounded-2xl border border-slate-700/60 space-y-3 mb-4 text-xs backdrop-blur-md">
           <div>
-            <label className="block font-bold text-gray-600 mb-1">Section:</label>
+            <label className="block font-semibold text-slate-300 mb-1">Target Section:</label>
             <select 
               value={batchSection} 
               onChange={(e) => setBatchSection(e.target.value)}
-              className="w-full p-2 border rounded bg-gray-50 font-bold"
+              className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold outline-none"
             >
-              <option value="12">All / Section 12</option>
+              <option value="12">All Grade 12 Sections</option>
               <option value="A">Section 12-A</option>
               <option value="B">Section 12-B</option>
             </select>
@@ -186,76 +192,76 @@ export default function App() {
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block font-bold text-gray-600 mb-1">Activity Type:</label>
+              <label className="block font-semibold text-slate-300 mb-1">Activity Category:</label>
               <select 
                 value={batchActivityType} 
                 onChange={(e) => setBatchActivityType(e.target.value)}
-                className="w-full p-2 border rounded bg-gray-50"
+                className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white outline-none"
               >
-                <option value="Practical">Practical (Lab)</option>
-                <option value="Participation">Participation</option>
-                <option value="ClassWork">ClassWork</option>
-                <option value="Exam">Exam</option>
+                <option value="Practical">💻 Practical (Lab)</option>
+                <option value="Participation">🙋 Participation</option>
+                <option value="ClassWork">📝 ClassWork</option>
+                <option value="Exam">📄 Exam</option>
               </select>
             </div>
             <div>
-              <label className="block font-bold text-gray-600 mb-1">Score / Points:</label>
+              <label className="block font-semibold text-slate-300 mb-1">Score Points:</label>
               <input 
                 type="number" 
                 value={batchScore} 
                 onChange={(e) => setBatchScore(e.target.value)}
-                className="w-full p-2 border rounded bg-gray-50 font-bold"
+                className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="block font-bold text-gray-600 mb-1">Topic / Exercise Name:</label>
+            <label className="block font-semibold text-slate-300 mb-1">Topic / Practical Title:</label>
             <input 
               type="text" 
-              placeholder="e.g. Flexbox Navbar Layout" 
+              placeholder="e.g. CSS Grid Portfolio Layout" 
               value={batchTopic} 
               onChange={(e) => setBatchTopic(e.target.value)}
-              className="w-full p-2 border rounded bg-gray-50"
+              className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white outline-none"
             />
           </div>
         </div>
 
         <div className="flex justify-between items-center mb-2 px-1">
-          <span className="text-xs font-bold text-gray-500 uppercase">
-            Select Students ({sectionStudents.length} available)
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            Students ({sectionStudents.length})
           </span>
-          <div className="space-x-2">
+          <div className="space-x-3 text-xs">
             <button 
               onClick={() => {
                 const all = {};
                 sectionStudents.forEach(s => all[s.name] = true);
                 setCheckedStudents(all);
               }}
-              className="text-[10px] text-blue-600 font-bold underline"
+              className="text-indigo-400 font-bold hover:underline"
             >
               Select All
             </button>
             <button 
               onClick={() => setCheckedStudents({})}
-              className="text-[10px] text-red-600 font-bold underline"
+              className="text-rose-400 font-bold hover:underline"
             >
               Clear
             </button>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border divide-y max-h-64 overflow-y-auto mb-4">
+        <div className="bg-slate-800/50 rounded-2xl border border-slate-700/60 divide-y divide-slate-700/40 max-h-64 overflow-y-auto mb-4">
           {sectionStudents.map((st, idx) => (
-            <label key={idx} className="flex items-center justify-between p-3 text-xs hover:bg-blue-50 cursor-pointer">
-              <span className="font-medium text-gray-800">{st.name}</span>
+            <label key={idx} className="flex items-center justify-between p-3 text-xs hover:bg-slate-700/30 cursor-pointer transition-colors">
+              <span className="font-medium text-slate-200">{st.name}</span>
               <input 
                 type="checkbox"
                 checked={!!checkedStudents[st.name]}
                 onChange={(e) => {
                   setCheckedStudents({ ...checkedStudents, [st.name]: e.target.checked });
                 }}
-                className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                className="w-4 h-4 text-indigo-600 rounded border-slate-600 bg-slate-900 focus:ring-indigo-500"
               />
             </label>
           ))}
@@ -263,19 +269,18 @@ export default function App() {
 
         <button 
           onClick={handleBatchSubmit}
-          className="w-full py-3 bg-green-600 text-white font-bold rounded-xl text-sm shadow-sm hover:bg-green-700 transition-colors"
+          className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-xl text-sm shadow-lg shadow-emerald-900/20 active:scale-[0.99] transition-all"
         >
-          Save Grades for Selected Students
+          Save Batch Marks Now 🚀
         </button>
       </div>
     );
   }
 
-  // 2. Student Login Onboarding with Protected Teacher Access
+  // 2. Student Login Onboarding with Modern Aesthetic
   if (!isNameSet) {
     const filteredRoster = searchQuery.trim() === '' ? [] : rosterList.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
     
-    // Check if secret URL parameter is present: e.g. yoursite.com/?mode=teacher
     const urlParams = new URLSearchParams(window.location.search);
     const isTeacherUrl = urlParams.get('mode') === 'teacher';
 
@@ -289,48 +294,51 @@ export default function App() {
     };
 
     return (
-      <div className="flex items-center justify-center min-h-screen p-6 bg-gray-50">
-        <div className="bg-white p-6 rounded-xl shadow-sm border w-full max-w-sm">
-          <div className="flex justify-between items-center mb-2">
-            <h2 className="text-lg font-bold text-gray-800">Grade 12 Portal Login</h2>
+      <div className="flex items-center justify-center min-h-screen p-6 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 font-sans">
+        <div className="bg-white/95 backdrop-blur-xl p-6 rounded-3xl shadow-2xl border border-white/20 w-full max-w-sm">
+          <div className="flex justify-between items-center mb-3">
+            <div className="flex items-center space-x-2">
+              <span className="text-xl">🎨</span>
+              <h2 className="text-lg font-extrabold text-slate-800">Grade 12 Web Dev</h2>
+            </div>
             {isTeacherUrl && (
               <button 
                 onClick={handleTeacherAccess}
-                className="text-[10px] bg-amber-50 text-amber-700 px-2 py-1 rounded font-bold border border-amber-200"
+                className="text-[10px] bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full font-bold border border-amber-300 shadow-sm"
               >
-                🔒 Teacher Login
+                🔒 Teacher
               </button>
             )}
           </div>
-          <p className="text-xs text-gray-500 mb-4">Search and select your official name:</p>
+          <p className="text-xs text-slate-500 mb-4 font-medium">Type your official name to enter your studio portal:</p>
 
           <input
             type="text"
-            placeholder="Type your name..."
+            placeholder="Search your name..."
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setSelectedStudent(null); }}
-            className="w-full p-3 border rounded-lg text-sm bg-gray-50 mb-3 outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full p-3.5 border-2 border-slate-200 rounded-2xl text-sm bg-slate-50/50 mb-3 outline-none focus:border-indigo-600 focus:bg-white transition-all font-medium text-slate-800"
           />
 
           {filteredRoster.length > 0 && !selectedStudent && (
-            <div className="max-h-48 overflow-y-auto border rounded-lg bg-white mb-4 divide-y">
+            <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-2xl bg-white mb-4 divide-y divide-slate-100 shadow-inner">
               {filteredRoster.map((st, idx) => (
                 <button
                   key={idx}
                   onClick={() => { setSelectedStudent(st); setSearchQuery(st.name); }}
-                  className="w-full p-3 text-left text-xs flex justify-between items-center hover:bg-blue-50"
+                  className="w-full p-3 text-left text-xs flex justify-between items-center hover:bg-indigo-50/80 transition-colors"
                 >
-                  <span className="font-medium">{st.name}</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-blue-100 text-blue-800">Sec {st.section}</span>
+                  <span className="font-semibold text-slate-700">{st.name}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-extrabold bg-indigo-100 text-indigo-700">Sec {st.section}</span>
                 </button>
               ))}
             </div>
           )}
 
           {selectedStudent && (
-            <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg mb-4 text-xs">
-              <span className="text-gray-500 block text-[10px] uppercase font-bold">Selected Student:</span>
-              <span className="font-bold text-blue-900 text-sm">{selectedStudent.name}</span>
+            <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200/80 p-3.5 rounded-2xl mb-4 text-xs">
+              <span className="text-indigo-400 block text-[9px] uppercase font-bold tracking-wider">Account Found:</span>
+              <span className="font-extrabold text-indigo-950 text-sm">{selectedStudent.name}</span>
             </div>
           )}
 
@@ -342,9 +350,9 @@ export default function App() {
               localStorage.setItem('portal_student_name', selectedStudent.name);
               fetchTasksAndStats(selectedStudent.name);
             }}
-            className="w-full py-3 bg-blue-600 text-white font-semibold rounded-lg text-sm disabled:opacity-50"
+            className="w-full py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold rounded-2xl text-sm disabled:opacity-40 shadow-lg shadow-indigo-600/30 active:scale-[0.98] transition-all"
           >
-            Continue
+            Launch Portal 🚀
           </button>
         </div>
       </div>
@@ -353,9 +361,9 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
-        <p className="text-xs text-gray-600">Loading Portal...</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white">
+        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+        <p className="text-xs font-semibold text-slate-400 tracking-wide">Syncing Portal Data...</p>
       </div>
     );
   }
@@ -368,51 +376,73 @@ export default function App() {
       : (subMode === 'file' ? fileData !== null : textSubmission.trim().length > 0);
 
     return (
-      <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto">
-        <button onClick={() => setSelectedTask(null)} className="text-xs text-blue-600 font-bold mb-4">← Back</button>
-        <div className="bg-white p-5 rounded-xl shadow-sm border">
-          <span className="text-xs font-semibold px-2.5 py-0.5 rounded bg-blue-100 text-blue-800 uppercase">{selectedTask.type}</span>
-          <h2 className="text-lg font-bold text-gray-800 mt-2 mb-4">{selectedTask.prompt}</h2>
+      <div className="min-h-screen bg-slate-100 p-4 max-w-lg mx-auto font-sans">
+        <button onClick={() => setSelectedTask(null)} className="text-xs text-indigo-600 font-bold mb-3 flex items-center space-x-1">
+          <span>←</span> <span>Back to Dashboard</span>
+        </button>
+        
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/80">
+          <div className="flex justify-between items-center mb-3">
+            <span className="text-[10px] font-extrabold px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 uppercase tracking-wider">
+              {selectedTask.type}
+            </span>
+            {selectedTask.deadline && (
+              <span className="text-[10px] text-slate-400 font-medium">
+                Due: {new Date(selectedTask.deadline).toLocaleDateString()}
+              </span>
+            )}
+          </div>
+
+          <h2 className="text-base font-extrabold text-slate-800 mb-1">{selectedTask.topic}</h2>
+          <p className="text-xs text-slate-600 mb-5 leading-relaxed">{selectedTask.prompt}</p>
 
           {selectedTask.status === "COMPLETED" ? (
-            <div className="bg-green-50 border border-green-200 p-4 rounded-lg text-center text-xs text-green-800 font-bold">
-              ✓ Task Already Submitted
+            <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl text-center text-xs text-emerald-800 font-bold flex items-center justify-center space-x-2">
+              <span>✓</span> <span>Task Completed & Submitted</span>
             </div>
           ) : isQuiz ? (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {selectedTask.options.map((opt, idx) => (
                 <button
                   key={idx}
                   onClick={() => setSelectedOption(idx)}
-                  className={`w-full p-3 text-left rounded-lg border text-sm ${selectedOption === idx ? 'border-blue-500 bg-blue-50 font-medium' : 'border-gray-200'}`}
+                  className={`w-full p-3.5 text-left rounded-2xl border-2 text-xs transition-all ${
+                    selectedOption === idx 
+                      ? 'border-indigo-600 bg-indigo-50/60 font-bold text-indigo-900 shadow-sm' 
+                      : 'border-slate-100 bg-slate-50/50 text-slate-700 hover:border-slate-200'
+                  }`}
                 >
-                  <span className="font-bold mr-2">{String.fromCharCode(65 + idx)}.</span> {opt}
+                  <span className="font-extrabold mr-2 text-indigo-600">{String.fromCharCode(65 + idx)}.</span> {opt}
                 </button>
               ))}
-              <button disabled={!isReadyToSubmit} onClick={handleSubmit} className="w-full mt-4 py-3 bg-blue-600 text-white font-semibold rounded-lg disabled:opacity-50">
-                Submit Quiz Response
+              <button 
+                disabled={!isReadyToSubmit} 
+                onClick={handleSubmit} 
+                className="w-full mt-4 py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold rounded-2xl disabled:opacity-40 shadow-md text-xs active:scale-[0.98] transition-all"
+              >
+                Submit Quiz Response ✨
               </button>
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Dual Submission Mode Toggle */}
-              <div className="flex bg-gray-200 p-1 rounded-lg text-xs font-semibold">
+              {/* Dual Mode Submission Switcher */}
+              <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
                 <button
                   onClick={() => { setSubMode('file'); setTextSubmission(''); }}
-                  className={`flex-1 py-1.5 rounded-md transition-all ${subMode === 'file' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600'}`}
+                  className={`flex-1 py-2 rounded-lg transition-all ${subMode === 'file' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
                 >
-                  📁 Upload File/Image
+                  📁 Upload File
                 </button>
                 <button
                   onClick={() => { setSubMode('link'); setFileData(null); }}
-                  className={`flex-1 py-1.5 rounded-md transition-all ${subMode === 'link' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600'}`}
+                  className={`flex-1 py-2 rounded-lg transition-all ${subMode === 'link' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
                 >
-                  🔗 Paste Link / URL
+                  🔗 Submit Link
                 </button>
               </div>
 
               {subMode === 'file' ? (
-                <div className="border-2 border-dashed border-gray-300 p-5 rounded-lg text-center bg-gray-50">
+                <div className="border-2 border-dashed border-slate-200 p-6 rounded-2xl text-center bg-slate-50/50 hover:bg-slate-50 transition-colors">
                   <input
                     type="file"
                     accept="image/png, image/jpeg, .pdf"
@@ -420,47 +450,46 @@ export default function App() {
                       const file = e.target.files[0];
                       if (!file) return;
                       if (file.size > 5 * 1024 * 1024) {
-                        alert("File size exceeds 5MB limit. Please use the 'Paste Link' tab.");
+                        alert("File exceeds 5MB limit. Please use the 'Submit Link' option.");
                         return;
                       }
                       const reader = new FileReader();
-                      reader.onload = () => {
+                      reader.onloadend = () => {
                         setFileData({ fileName: file.name, mimeType: file.type, fileBase64: reader.result });
                       };
                       reader.readAsDataURL(file);
                     }}
-                    className="text-xs text-gray-600"
+                    className="text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                   />
-                  <p className="text-[10px] text-gray-400 mt-2">Max file size: 5MB (PNG, JPG, PDF)</p>
+                  <p className="text-[10px] text-slate-400 mt-2">Max file size: 5MB (PNG, JPG, PDF)</p>
                   {fileData && (
-                    <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-green-800 text-xs font-bold">
-                      ✓ Ready to upload: {fileData.fileName}
+                    <div className="mt-3 p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold">
+                      ✓ Ready: {fileData.fileName}
                     </div>
                   )}
                 </div>
               ) : (
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Project Link (GitHub / Vercel / Live URL):</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Project Link (GitHub / Vercel / Live URL):</label>
                     <textarea
                       rows="3"
                       value={textSubmission}
                       onChange={(e) => setTextSubmission(e.target.value)}
                       placeholder="https://github.com/... or https://vercel.app/..."
-                      className="w-full p-3 text-xs bg-gray-50 rounded-lg border focus:outline-none"
+                      className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 font-medium"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Group Members (If applicable):</label>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Group Teammates (If group project):</label>
                     <input
                       type="text"
                       value={groupMembers}
                       onChange={(e) => setGroupMembers(e.target.value)}
                       placeholder="e.g. Chaltu Lemma, Dawit Bekele"
-                      className="w-full p-3 text-xs bg-gray-50 rounded-lg border focus:outline-none"
+                      className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 font-medium"
                     />
-                    <p className="text-[10px] text-gray-400 mt-1">Leave blank if this was an individual task.</p>
                   </div>
                 </div>
               )}
@@ -468,9 +497,9 @@ export default function App() {
               <button 
                 disabled={!isReadyToSubmit} 
                 onClick={handleSubmit} 
-                className="w-full py-3 bg-green-600 text-white font-semibold rounded-lg disabled:opacity-50 text-xs transition-all"
+                className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-2xl disabled:opacity-40 text-xs shadow-md active:scale-[0.98] transition-all"
               >
-                Submit Task
+                Submit Project 🚀
               </button>
             </div>
           )}
@@ -479,89 +508,135 @@ export default function App() {
     );
   }
 
-  // Navigation Menu Tabs including Missing
-  const tabs = ['Quiz', 'ClassWork', 'Practical', 'Exam', 'Assignment', 'Missing', 'Portal'];
-  
-  // Filtering tasks by Active Tab
+  // 4-Tab Menu Options
+  const tabs = [
+    { key: 'Tasks', label: '📚 All Tasks' },
+    { key: 'Practical', label: '💻 Practical' },
+    { key: 'Missing', label: '⚠️ Missing' },
+    { key: 'Portal', label: '🎓 Gradebook' }
+  ];
+
+  // Filtering Logic
   const filteredTasks = allTasks.filter(t => {
-    if (activeTab === 'Portal') return true;
+    if (activeTab === 'Tasks') return true;
+    if (activeTab === 'Practical') return t.type.toLowerCase().includes('practical');
     if (activeTab === 'Missing') return t.status === 'MISSING';
-    return t.type.toLowerCase().includes(activeTab.toLowerCase());
+    return true;
   });
 
-  // 4. Main Student Dashboard
+  // 4. Main Student Dashboard View
   return (
-    <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto">
-      <header className="mb-4 flex justify-between items-center">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800">Grade 12 Portal</h1>
-          <p className="text-xs text-gray-500">
-            Student: <span className="font-bold text-gray-700">{studentName}</span> 
-            <button onClick={() => { setIsNameSet(false); localStorage.removeItem('portal_student_name'); }} className="text-[10px] text-blue-600 underline ml-1">(Switch)</button>
-          </p>
-        </div>
-        {studentStats && (
-          <div className="text-right">
-            <span className="text-xs text-gray-400 block">Total Grade</span>
-            <span className="text-base font-extrabold text-blue-600">{studentStats.totalScore}%</span>
+    <div className="min-h-screen bg-slate-100 p-4 max-w-lg mx-auto font-sans pb-12">
+      {/* Header Profile Card */}
+      <div className="bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 rounded-3xl p-5 text-white shadow-xl mb-4 relative overflow-hidden">
+        <div className="relative z-10 flex justify-between items-start">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Grade 12 Web Dev</span>
+            <h1 className="text-lg font-extrabold flex items-center space-x-1.5 mt-0.5">
+              <span>{studentName}</span>
+              <span className="text-xs">👋</span>
+            </h1>
+            <button 
+              onClick={() => { setIsNameSet(false); localStorage.removeItem('portal_student_name'); }} 
+              className="text-[10px] text-indigo-300 hover:text-white underline font-semibold mt-1 block"
+            >
+              Switch Account
+            </button>
           </div>
-        )}
-      </header>
 
-      {/* Dynamic Navigation Menu Tabs */}
-      <div className="flex bg-gray-200 p-1 rounded-xl mb-4 text-[10px] font-semibold overflow-x-auto">
+          <div className="text-right bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/10">
+            <span className="text-[9px] uppercase font-extrabold text-indigo-200 block">Overall Score</span>
+            <span className="text-lg font-black text-emerald-400">{studentStats?.totalScore || 0}%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Modern Pill Navigation Tabs */}
+      <div className="flex bg-slate-200/80 p-1 rounded-2xl mb-4 text-xs font-bold backdrop-blur-sm">
         {tabs.map(tab => (
           <button 
-            key={tab} 
-            onClick={() => setActiveTab(tab)} 
-            className={`flex-1 py-2 px-2 text-center rounded-lg whitespace-nowrap transition-all ${
-              activeTab === tab 
-                ? 'bg-white text-blue-600 shadow-sm font-bold' 
-                : tab === 'Missing' 
-                ? 'text-red-600 hover:bg-red-50 font-bold' 
-                : 'text-gray-600'
+            key={tab.key} 
+            onClick={() => setActiveTab(tab.key)} 
+            className={`flex-1 py-2.5 px-2 text-center rounded-xl whitespace-nowrap transition-all ${
+              activeTab === tab.key 
+                ? 'bg-white text-indigo-600 shadow-sm font-extrabold' 
+                : tab.key === 'Missing'
+                ? 'text-rose-600 hover:bg-rose-50/50'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            {tab === 'Portal' ? '🎓 Grades' : tab === 'Missing' ? '⚠️ Missing' : tab}
+            {tab.label}
           </button>
         ))}
       </div>
 
+      {/* Tab Content Display */}
       {activeTab === 'Portal' ? (
-        <div className="bg-white p-5 rounded-xl shadow-sm border space-y-4">
-          <h2 className="text-base font-bold text-gray-800">Assessment Breakdown</h2>
-          <div className="grid grid-cols-3 gap-2 text-center text-xs">
-            <div className="bg-blue-50 p-2 rounded border"><span className="block text-[9px] text-blue-600 font-bold">Quiz (15%)</span><span className="text-sm font-bold">{studentStats?.quizAvg}%</span></div>
-            <div className="bg-indigo-50 p-2 rounded border"><span className="block text-[9px] text-indigo-600 font-bold">ClassWork (10%)</span><span className="text-sm font-bold">{studentStats?.classworkAvg}%</span></div>
-            <div className="bg-green-50 p-2 rounded border"><span className="block text-[9px] text-green-600 font-bold">Practical (25%)</span><span className="text-sm font-bold">{studentStats?.practicalAvg}%</span></div>
-            <div className="bg-purple-50 p-2 rounded border"><span className="block text-[9px] text-purple-600 font-bold">Exam (30%)</span><span className="text-sm font-bold">{studentStats?.examAvg}%</span></div>
-            <div className="bg-amber-50 p-2 rounded border"><span className="block text-[9px] text-amber-600 font-bold">Assign (15%)</span><span className="text-sm font-bold">{studentStats?.assignmentAvg}%</span></div>
-            <div className="bg-rose-50 p-2 rounded border"><span className="block text-[9px] text-rose-600 font-bold">H/W (5%)</span><span className="text-sm font-bold">{studentStats?.homeworkAvg}%</span></div>
+        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/80 space-y-4">
+          <h2 className="text-sm font-extrabold text-slate-800 flex items-center justify-between">
+            <span>Assessment Breakdown</span>
+            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-bold">Term Mark</span>
+          </h2>
+
+          <div className="grid grid-cols-3 gap-2.5 text-center">
+            <div className="bg-blue-50/80 p-3 rounded-2xl border border-blue-100">
+              <span className="block text-[9px] text-blue-600 font-extrabold">Quiz (15%)</span>
+              <span className="text-base font-extrabold text-blue-900">{studentStats?.quizAvg}%</span>
+            </div>
+            <div className="bg-indigo-50/80 p-3 rounded-2xl border border-indigo-100">
+              <span className="block text-[9px] text-indigo-600 font-extrabold">ClassWork (10%)</span>
+              <span className="text-base font-extrabold text-indigo-900">{studentStats?.classworkAvg}%</span>
+            </div>
+            <div className="bg-emerald-50/80 p-3 rounded-2xl border border-emerald-100">
+              <span className="block text-[9px] text-emerald-600 font-extrabold">Practical (25%)</span>
+              <span className="text-base font-extrabold text-emerald-900">{studentStats?.practicalAvg}%</span>
+            </div>
+            <div className="bg-purple-50/80 p-3 rounded-2xl border border-purple-100">
+              <span className="block text-[9px] text-purple-600 font-extrabold">Exam (30%)</span>
+              <span className="text-base font-extrabold text-purple-900">{studentStats?.examAvg}%</span>
+            </div>
+            <div className="bg-amber-50/80 p-3 rounded-2xl border border-amber-100">
+              <span className="block text-[9px] text-amber-600 font-extrabold">Assign (15%)</span>
+              <span className="text-base font-extrabold text-amber-900">{studentStats?.assignmentAvg}%</span>
+            </div>
+            <div className="bg-rose-50/80 p-3 rounded-2xl border border-rose-100">
+              <span className="block text-[9px] text-rose-600 font-extrabold">Homework (5%)</span>
+              <span className="text-base font-extrabold text-rose-900">{studentStats?.homeworkAvg}%</span>
+            </div>
           </div>
         </div>
       ) : (
         <div className="space-y-3">
           {filteredTasks.length === 0 ? (
-            <p className="text-center text-xs text-gray-500 py-8">
-              {activeTab === 'Missing' ? '🎉 No missing tasks! All caught up.' : `No tasks found for ${activeTab}.`}
-            </p>
+            <div className="bg-white p-8 rounded-3xl border border-slate-200/80 text-center">
+              <span className="text-2xl block mb-2">🎉</span>
+              <p className="text-xs font-bold text-slate-600">
+                {activeTab === 'Missing' ? 'No missing tasks! You are all caught up.' : `No tasks found for ${activeTab}.`}
+              </p>
+            </div>
           ) : (
             filteredTasks.map(t => (
               <div 
                 key={t.taskId} 
                 onClick={() => setSelectedTask(t)} 
-                className="bg-white p-4 rounded-xl shadow-sm border cursor-pointer flex justify-between items-center hover:border-blue-300 transition-all"
+                className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 cursor-pointer flex justify-between items-center hover:border-indigo-400 transition-all active:scale-[0.99]"
               >
                 <div>
-                  <span className="text-xs font-bold text-gray-700 block">{t.topic}</span>
-                  <span className="text-xs text-gray-400 line-clamp-1">{t.prompt}</span>
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                      {t.type}
+                    </span>
+                    <span className="text-xs font-extrabold text-slate-800">{t.topic}</span>
+                  </div>
+                  <p className="text-xs text-slate-400 line-clamp-1">{t.prompt}</p>
                 </div>
-                <span className={`text-[10px] font-bold px-2 py-1 rounded ${
+
+                <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
                   t.status === 'COMPLETED' 
-                    ? 'bg-green-100 text-green-800' 
+                    ? 'bg-emerald-100 text-emerald-800' 
                     : t.status === 'MISSING' 
-                    ? 'bg-red-100 text-red-800' 
-                    : 'bg-blue-100 text-blue-800'
+                    ? 'bg-rose-100 text-rose-800' 
+                    : 'bg-indigo-100 text-indigo-800'
                 }`}>
                   {t.status}
                 </span>
