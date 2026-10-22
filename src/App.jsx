@@ -185,8 +185,8 @@ export default function App() {
               className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold outline-none"
             >
               <option value="12">All Grade 12 Sections</option>
-              <option value="A">Section 12-A</option>
               <option value="B">Section 12-B</option>
+              <option value="C">Section 12-C</option>
             </select>
           </div>
 
