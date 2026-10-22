@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 // REPLACE WITH YOUR PUBLISHED GOOGLE APPS SCRIPT WEB APP EXEC URL
-const API_URL = "https://script.google.com/macros/s/AKfycbxL938suJ_y69vkVJc1UV_TfE6expOM8zw-OPeZKmFSTc8LvCam3Xpk2vXTnp0tVnZS-A/exec";
+const API_URL = "https://script.google.com/macros/library/d/1f3R23CRjB-UnXGMUdCKgJOVwXGv9XE0XigujQ82OyLMKCOaQTQi8Gnit/8";
 
 export default function App() {
   const [allTasks, setAllTasks] = useState([]);
@@ -9,7 +9,7 @@ export default function App() {
   const [studentStats, setStudentStats] = useState(null);
   
   // Navigation & Session States
-  const [activeTab, setActiveTab] = useState('Quiz'); 
+  const [activeTab, setActiveTab] = useState('Quiz'); // Quiz, ClassWork, Practical, Exam, Assignment, Missing, Portal
   const [selectedTask, setSelectedTask] = useState(null);
   const [studentName, setStudentName] = useState('');
   const [isNameSet, setIsNameSet] = useState(false);
@@ -24,9 +24,12 @@ export default function App() {
   const [batchScore, setBatchScore] = useState(3);
   const [checkedStudents, setCheckedStudents] = useState({});
 
-  // Form Inputs
+  // Submission States
   const [selectedOption, setSelectedOption] = useState(null);
   const [textSubmission, setTextSubmission] = useState('');
+  const [groupMembers, setGroupMembers] = useState('');
+  const [subMode, setSubMode] = useState('file'); // 'file' or 'link'
+  const [fileData, setFileData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const tg = window.Telegram?.WebApp;
@@ -71,7 +74,18 @@ export default function App() {
     const isQuiz = selectedTask.type.toLowerCase().includes('quiz');
     const isCorrect = selectedOption === selectedTask.correctIndex;
     const score = isQuiz ? (isCorrect ? 100 : 0) : null;
-    const submissionVal = isQuiz ? `Selected Option: ${selectedOption}` : textSubmission;
+    
+    let submissionVal = textSubmission;
+    if (isQuiz) {
+      submissionVal = `Selected Option: ${selectedOption}`;
+    } else {
+      if (groupMembers.trim()) {
+        submissionVal = `${submissionVal} [Group Members: ${groupMembers.trim()}]`;
+      }
+      if (subMode === 'file' && fileData) {
+        submissionVal = `Uploaded File: ${fileData.fileName}`;
+      }
+    }
 
     const payload = {
       userId: userId,
@@ -79,7 +93,10 @@ export default function App() {
       taskId: selectedTask.taskId,
       taskType: selectedTask.type,
       submission: submissionVal,
-      score: score
+      score: score,
+      fileBase64: fileData ? fileData.fileBase64 : null,
+      fileName: fileData ? fileData.fileName : null,
+      mimeType: fileData ? fileData.mimeType : null
     };
 
     fetch(API_URL, {
@@ -90,6 +107,8 @@ export default function App() {
     })
       .then(() => {
         setTextSubmission('');
+        setGroupMembers('');
+        setFileData(null);
         setSelectedOption(null);
         setSelectedTask(null);
         fetchTasksAndStats(studentName);
@@ -252,21 +271,36 @@ export default function App() {
     );
   }
 
-  // 2. Student Login Onboarding
+  // 2. Student Login Onboarding with Protected Teacher Access
   if (!isNameSet) {
     const filteredRoster = searchQuery.trim() === '' ? [] : rosterList.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    // Check if secret URL parameter is present: e.g. yoursite.com/?mode=teacher
+    const urlParams = new URLSearchParams(window.location.search);
+    const isTeacherUrl = urlParams.get('mode') === 'teacher';
+
+    const handleTeacherAccess = () => {
+      const pin = prompt("Enter Teacher Security PIN:");
+      if (pin === "1234") { // Replace "1234" with your secret PIN
+        setIsTeacherMode(true);
+      } else if (pin !== null) {
+        alert("Incorrect PIN. Access denied.");
+      }
+    };
 
     return (
       <div className="flex items-center justify-center min-h-screen p-6 bg-gray-50">
         <div className="bg-white p-6 rounded-xl shadow-sm border w-full max-w-sm">
           <div className="flex justify-between items-center mb-2">
             <h2 className="text-lg font-bold text-gray-800">Grade 12 Portal Login</h2>
-            <button 
-              onClick={() => setIsTeacherMode(true)}
-              className="text-[10px] bg-blue-50 text-blue-700 px-2 py-1 rounded font-bold border border-blue-200"
-            >
-              ⚙️ Teacher Mode
-            </button>
+            {isTeacherUrl && (
+              <button 
+                onClick={handleTeacherAccess}
+                className="text-[10px] bg-amber-50 text-amber-700 px-2 py-1 rounded font-bold border border-amber-200"
+              >
+                🔒 Teacher Login
+              </button>
+            )}
           </div>
           <p className="text-xs text-gray-500 mb-4">Search and select your official name:</p>
 
@@ -329,6 +363,9 @@ export default function App() {
   // 3. Selected Task Detail View
   if (selectedTask) {
     const isQuiz = selectedTask.type.toLowerCase().includes('quiz');
+    const isReadyToSubmit = isQuiz 
+      ? selectedOption !== null 
+      : (subMode === 'file' ? fileData !== null : textSubmission.trim().length > 0);
 
     return (
       <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto">
@@ -352,21 +389,88 @@ export default function App() {
                   <span className="font-bold mr-2">{String.fromCharCode(65 + idx)}.</span> {opt}
                 </button>
               ))}
-              <button disabled={selectedOption === null} onClick={handleSubmit} className="w-full mt-4 py-3 bg-blue-600 text-white font-semibold rounded-lg disabled:opacity-50">
-                Submit Quiz
+              <button disabled={!isReadyToSubmit} onClick={handleSubmit} className="w-full mt-4 py-3 bg-blue-600 text-white font-semibold rounded-lg disabled:opacity-50">
+                Submit Quiz Response
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
-              <textarea
-                rows="6"
-                value={textSubmission}
-                onChange={(e) => setTextSubmission(e.target.value)}
-                placeholder="Paste your GitHub URL, Vercel deployment link, or project notes here..."
-                className="w-full p-3 text-xs bg-gray-50 rounded-lg border focus:outline-none"
-              />
-              <button disabled={!textSubmission.trim()} onClick={handleSubmit} className="w-full py-3 bg-green-600 text-white font-semibold rounded-lg disabled:opacity-50">
-                Submit Assignment / Project Link
+            <div className="space-y-4">
+              {/* Dual Submission Mode Toggle */}
+              <div className="flex bg-gray-200 p-1 rounded-lg text-xs font-semibold">
+                <button
+                  onClick={() => { setSubMode('file'); setTextSubmission(''); }}
+                  className={`flex-1 py-1.5 rounded-md transition-all ${subMode === 'file' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600'}`}
+                >
+                  📁 Upload File/Image
+                </button>
+                <button
+                  onClick={() => { setSubMode('link'); setFileData(null); }}
+                  className={`flex-1 py-1.5 rounded-md transition-all ${subMode === 'link' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600'}`}
+                >
+                  🔗 Paste Link / URL
+                </button>
+              </div>
+
+              {subMode === 'file' ? (
+                <div className="border-2 border-dashed border-gray-300 p-5 rounded-lg text-center bg-gray-50">
+                  <input
+                    type="file"
+                    accept="image/png, image/jpeg, .pdf"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      if (file.size > 5 * 1024 * 1024) {
+                        alert("File size exceeds 5MB limit. Please use the 'Paste Link' tab.");
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        setFileData({ fileName: file.name, mimeType: file.type, fileBase64: reader.result });
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="text-xs text-gray-600"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-2">Max file size: 5MB (PNG, JPG, PDF)</p>
+                  {fileData && (
+                    <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded text-green-800 text-xs font-bold">
+                      ✓ Ready to upload: {fileData.fileName}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Project Link (GitHub / Vercel / Live URL):</label>
+                    <textarea
+                      rows="3"
+                      value={textSubmission}
+                      onChange={(e) => setTextSubmission(e.target.value)}
+                      placeholder="https://github.com/... or https://vercel.app/..."
+                      className="w-full p-3 text-xs bg-gray-50 rounded-lg border focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Group Members (If applicable):</label>
+                    <input
+                      type="text"
+                      value={groupMembers}
+                      onChange={(e) => setGroupMembers(e.target.value)}
+                      placeholder="e.g. Chaltu Lemma, Dawit Bekele"
+                      className="w-full p-3 text-xs bg-gray-50 rounded-lg border focus:outline-none"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Leave blank if this was an individual task.</p>
+                  </div>
+                </div>
+              )}
+
+              <button 
+                disabled={!isReadyToSubmit} 
+                onClick={handleSubmit} 
+                className="w-full py-3 bg-green-600 text-white font-semibold rounded-lg disabled:opacity-50 text-xs transition-all"
+              >
+                Submit Task
               </button>
             </div>
           )}
@@ -375,8 +479,15 @@ export default function App() {
     );
   }
 
-  const tabs = ['Quiz', 'ClassWork', 'Practical', 'Exam', 'Assignment', 'Portal'];
-  const filteredTasks = allTasks.filter(t => activeTab === 'Portal' || t.type.toLowerCase().includes(activeTab.toLowerCase()));
+  // Navigation Menu Tabs including Missing
+  const tabs = ['Quiz', 'ClassWork', 'Practical', 'Exam', 'Assignment', 'Missing', 'Portal'];
+  
+  // Filtering tasks by Active Tab
+  const filteredTasks = allTasks.filter(t => {
+    if (activeTab === 'Portal') return true;
+    if (activeTab === 'Missing') return t.status === 'MISSING';
+    return t.type.toLowerCase().includes(activeTab.toLowerCase());
+  });
 
   // 4. Main Student Dashboard
   return (
@@ -397,10 +508,21 @@ export default function App() {
         )}
       </header>
 
+      {/* Dynamic Navigation Menu Tabs */}
       <div className="flex bg-gray-200 p-1 rounded-xl mb-4 text-[10px] font-semibold overflow-x-auto">
         {tabs.map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 py-2 px-2 text-center rounded-lg whitespace-nowrap ${activeTab === tab ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600'}`}>
-            {tab === 'Portal' ? '🎓 Grades' : tab}
+          <button 
+            key={tab} 
+            onClick={() => setActiveTab(tab)} 
+            className={`flex-1 py-2 px-2 text-center rounded-lg whitespace-nowrap transition-all ${
+              activeTab === tab 
+                ? 'bg-white text-blue-600 shadow-sm font-bold' 
+                : tab === 'Missing' 
+                ? 'text-red-600 hover:bg-red-50 font-bold' 
+                : 'text-gray-600'
+            }`}
+          >
+            {tab === 'Portal' ? '🎓 Grades' : tab === 'Missing' ? '⚠️ Missing' : tab}
           </button>
         ))}
       </div>
@@ -420,15 +542,29 @@ export default function App() {
       ) : (
         <div className="space-y-3">
           {filteredTasks.length === 0 ? (
-            <p className="text-center text-xs text-gray-500 py-8">No tasks found for {activeTab}.</p>
+            <p className="text-center text-xs text-gray-500 py-8">
+              {activeTab === 'Missing' ? '🎉 No missing tasks! All caught up.' : `No tasks found for ${activeTab}.`}
+            </p>
           ) : (
             filteredTasks.map(t => (
-              <div key={t.taskId} onClick={() => setSelectedTask(t)} className="bg-white p-4 rounded-xl shadow-sm border cursor-pointer flex justify-between items-center hover:border-blue-300">
+              <div 
+                key={t.taskId} 
+                onClick={() => setSelectedTask(t)} 
+                className="bg-white p-4 rounded-xl shadow-sm border cursor-pointer flex justify-between items-center hover:border-blue-300 transition-all"
+              >
                 <div>
                   <span className="text-xs font-bold text-gray-700 block">{t.topic}</span>
                   <span className="text-xs text-gray-400 line-clamp-1">{t.prompt}</span>
                 </div>
-                <span className={`text-[10px] font-bold px-2 py-1 rounded ${t.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>{t.status}</span>
+                <span className={`text-[10px] font-bold px-2 py-1 rounded ${
+                  t.status === 'COMPLETED' 
+                    ? 'bg-green-100 text-green-800' 
+                    : t.status === 'MISSING' 
+                    ? 'bg-red-100 text-red-800' 
+                    : 'bg-blue-100 text-blue-800'
+                }`}>
+                  {t.status}
+                </span>
               </div>
             ))
           )}
