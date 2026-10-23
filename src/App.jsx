@@ -75,56 +75,7 @@ export default function App() {
     
     let submissionVal = customSubmissionText !== null ? customSubmissionText : textSubmission;
     if (isQuiz) {
-      submissionVal = `Quiz Score Achieved: ${finalScoreOverride}%`;
-    } else {
-      if (groupMembers.trim()) {
-        submissionVal = `${submissionVal} [Group Members: ${groupMembers.trim()}]`;
-      }
-    }
-
-    const payload = {
-      userId: userId,
-      userName: studentName,
-      taskId: selectedTask.taskId,
-      taskType: selectedTask.type,
-      submission: submissionVal,
-      score: score
-    };
-
-    fetch(API_URL, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    })
-      .then(() => {
-        setTextSubmission('');
-        setGroupMembers('');
-        setSelectedOption(null);
-        setSelectedIndexes({});
-        setSelectedTask(null);
-        fetchTasksAndStats(studentName);
-      })
-      .catch((err) => {
-        console.error("Submit Error:", err);
-        setLoading(false);
-      });
-  };
-
-  const handleBatchSubmit = () => {
-    const selectedNames = Object.keys(checkedStudents).filter(name => checkedStudents[name]);
-    if (selectedNames.length === 0) {
-      alert("Please select at least one student!");
-      return;
-    }
-
-    setLoading(true);
-    const payload = {
-      isBatch: true,
-      students: selectedNames,
-      section: batchSection,
-      activityType: batchActivityType,
-      topic: batchTopic || `${batchActivityType} Session`,
+      submissionVal = `Quiz Score Achieved: ${finalScoreOverride}\%`; } else { if (groupMembers.trim()) { submissionVal = `${submissionVal} [Group Members: ${groupMembers.trim()}]`; } }  const payload = { userId: userId, userName: studentName, taskId: selectedTask.taskId, taskType: selectedTask.type, submission: submissionVal, score: score };  fetch(API_URL, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }) .then(() => { setTextSubmission(''); setGroupMembers(''); setSelectedOption(null); setSelectedIndexes({}); setSelectedTask(null); fetchTasksAndStats(studentName); }) .catch((err) => { console.error("Submit Error:", err); setLoading(false); }); };  const handleBatchSubmit = () => { const selectedNames = Object.keys(checkedStudents).filter(name => checkedStudents[name]); if (selectedNames.length === 0) { alert("Please select at least one student!"); return; }  setLoading(true); const payload = { isBatch: true, students: selectedNames, section: batchSection, activityType: batchActivityType, topic: batchTopic \vert{}\vert{} `${batchActivityType} Session`,
       score: Number(batchScore)
     };
 
@@ -360,18 +311,19 @@ export default function App() {
     );
   }
 
-  // 3. Selected Task Detail View (Link & Multi-Question Quiz Support Only)
+  // 3. Selected Task Detail View (Link & Multi-Question JSON Quiz Support)
   if (selectedTask) {
     const isQuiz = selectedTask.type.toLowerCase().includes('quiz');
     
-    // Check readiness
+    const opts = selectedTask.options || [];
+    const isMultiQuestion = opts.length > 0 && typeof opts[0] === 'object' && opts[0] !== null && 'q' in opts[0];
     const isReadyToSubmit = isQuiz 
-      ? Object.keys(selectedIndexes).length > 0 
+      ? (isMultiQuestion ? Object.keys(selectedIndexes).length > 0 : selectedOption !== null)
       : textSubmission.trim().length > 0;
 
     return (
       <div className="min-h-screen bg-slate-100 p-4 max-w-lg mx-auto font-sans">
-        <button onClick={() => setSelectedTask(null)} className="text-xs text-indigo-600 font-bold mb-3 flex items-center space-x-1">
+        <button onClick={() => { setSelectedTask(null); setSelectedOption(null); setSelectedIndexes({}); }} className="text-xs text-indigo-600 font-bold mb-3 flex items-center space-x-1">
           <span>←</span> <span>Back to Dashboard</span>
         </button>
         
@@ -397,12 +349,9 @@ export default function App() {
           ) : isQuiz ? (
             <div className="space-y-4">
               {(() => {
-                let questionsList = [];
-                try {
-                  questionsList = JSON.parse(selectedTask.options);
-                } catch (e) {
-                  questionsList = [{ q: selectedTask.prompt, opts: selectedTask.options, ans: selectedTask.correctIndex }];
-                }
+                const questionsList = isMultiQuestion 
+                  ? opts 
+                  : [{ q: selectedTask.prompt, opts: opts, ans: selectedTask.correctIndex }];
 
                 return questionsList.map((item, qIndex) => (
                   <div key={qIndex} className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
@@ -414,10 +363,14 @@ export default function App() {
                         <button
                           key={oIndex}
                           onClick={() => {
-                            setSelectedIndexes(prev => ({ ...prev, [qIndex]: oIndex }));
+                            if (isMultiQuestion) {
+                              setSelectedIndexes(prev => ({ ...prev, [qIndex]: oIndex }));
+                            } else {
+                              setSelectedOption(oIndex);
+                            }
                           }}
                           className={`w-full p-3 text-left rounded-xl border text-xs transition-all ${
-                            selectedIndexes[qIndex] === oIndex 
+                            (isMultiQuestion ? selectedIndexes[qIndex] === oIndex : selectedOption === oIndex)
                               ? 'border-indigo-600 bg-indigo-50 font-bold text-indigo-900 shadow-sm' 
                               : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
                           }`}
@@ -433,16 +386,14 @@ export default function App() {
               <button 
                 disabled={!isReadyToSubmit} 
                 onClick={() => {
-                  let questionsList = [];
-                  try {
-                    questionsList = JSON.parse(selectedTask.options);
-                  } catch (e) {
-                    questionsList = [{ q: selectedTask.prompt, opts: selectedTask.options, ans: selectedTask.correctIndex }];
-                  }
+                  const questionsList = isMultiQuestion 
+                    ? opts 
+                    : [{ q: selectedTask.prompt, opts: opts, ans: selectedTask.correctIndex }];
 
                   let correctCount = 0;
                   questionsList.forEach((item, idx) => {
-                    if (selectedIndexes[idx] === item.ans) {
+                    const studentAns = isMultiQuestion ? selectedIndexes[idx] : selectedOption;
+                    if (studentAns === item.ans) {
                       correctCount++;
                     }
                   });
@@ -503,8 +454,7 @@ export default function App() {
     { key: 'Portal', label: '🎓 Gradebook' }
   ];
 
-  // Filtering Logic & Better Sorting Order:
-  // Order priority: PENDING first, then MISSING, then COMPLETED at the bottom
+  // Filtering & Sorting (Pending -> Missing -> Completed)
   const statusOrder = { "PENDING": 1, "MISSING": 2, "COMPLETED": 3 };
 
   const filteredTasks = allTasks
@@ -549,94 +499,4 @@ export default function App() {
           <button 
             key={tab.key} 
             onClick={() => setActiveTab(tab.key)} 
-            className={`flex-1 py-2.5 px-2 text-center rounded-xl whitespace-nowrap transition-all ${
-              activeTab === tab.key 
-                ? 'bg-white text-indigo-600 shadow-sm font-extrabold' 
-                : tab.key === 'Missing'
-                ? 'text-rose-600 hover:bg-rose-50/50'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab Content Display */}
-      {activeTab === 'Portal' ? (
-        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/80 space-y-4">
-          <h2 className="text-sm font-extrabold text-slate-800 flex items-center justify-between">
-            <span>Assessment Breakdown</span>
-            <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-bold">Term Mark</span>
-          </h2>
-
-          <div className="grid grid-cols-3 gap-2.5 text-center">
-            <div className="bg-blue-50/80 p-3 rounded-2xl border border-blue-100">
-              <span className="block text-[9px] text-blue-600 font-extrabold">Quiz (15%)</span>
-              <span className="text-base font-extrabold text-blue-900">{studentStats?.quizAvg}%</span>
-            </div>
-            <div className="bg-indigo-50/80 p-3 rounded-2xl border border-indigo-100">
-              <span className="block text-[9px] text-indigo-600 font-extrabold">ClassWork (10%)</span>
-              <span className="text-base font-extrabold text-indigo-900">{studentStats?.classworkAvg}%</span>
-            </div>
-            <div className="bg-emerald-50/80 p-3 rounded-2xl border border-emerald-100">
-              <span className="block text-[9px] text-emerald-600 font-extrabold">Practical (25%)</span>
-              <span className="text-base font-extrabold text-emerald-900">{studentStats?.practicalAvg}%</span>
-            </div>
-            <div className="bg-purple-50/80 p-3 rounded-2xl border border-purple-100">
-              <span className="block text-[9px] text-purple-600 font-extrabold">Exam (30%)</span>
-              <span className="text-base font-extrabold text-purple-900">{studentStats?.examAvg}%</span>
-            </div>
-            <div className="bg-amber-50/80 p-3 rounded-2xl border border-amber-100">
-              <span className="block text-[9px] text-amber-600 font-extrabold">Assign (15%)</span>
-              <span className="text-base font-extrabold text-amber-900">{studentStats?.assignmentAvg}%</span>
-            </div>
-            <div className="bg-rose-50/80 p-3 rounded-2xl border border-rose-100">
-              <span className="block text-[9px] text-rose-600 font-extrabold">Homework (5%)</span>
-              <span className="text-base font-extrabold text-rose-900">{studentStats?.homeworkAvg}%</span>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filteredTasks.length === 0 ? (
-            <div className="bg-white p-8 rounded-3xl border border-slate-200/80 text-center">
-              <span className="text-2xl block mb-2">🎉</span>
-              <p className="text-xs font-bold text-slate-600">
-                {activeTab === 'Missing' ? 'No missing tasks! You are all caught up.' : `No tasks found for ${activeTab}.`}
-              </p>
-            </div>
-          ) : (
-            filteredTasks.map(t => (
-              <div 
-                key={t.taskId} 
-                onClick={() => setSelectedTask(t)} 
-                className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 cursor-pointer flex justify-between items-center hover:border-indigo-400 transition-all active:scale-[0.99]"
-              >
-                <div>
-                  <div className="flex items-center space-x-2 mb-1">
-                    <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-                      {t.type}
-                    </span>
-                    <span className="text-xs font-extrabold text-slate-800">{t.topic}</span>
-                  </div>
-                  <p className="text-xs text-slate-400 line-clamp-1">{t.prompt}</p>
-                </div>
-
-                <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
-                  t.status === 'COMPLETED' 
-                    ? 'bg-emerald-100 text-emerald-800' 
-                    : t.status === 'MISSING' 
-                    ? 'bg-rose-100 text-rose-800' 
-                    : 'bg-indigo-100 text-indigo-800'
-                }`}>
-                  {t.status}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+            className={`flex-1 py-2
