@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 
 // REPLACE WITH YOUR PUBLISHED GOOGLE APPS SCRIPT WEB APP EXEC URL
-const API_URL = "https://script.google.com/macros/s/AKfycbxyTqKByC-K9G6sGPgMg9wNpD49DJP2RnjYz3W4wOMx2ZqkX3y6EiLghacxZyph4gfjfQ/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbzwov6b4eOS4mh6t5lbMM09NRrXYE3cX5PD4rp5lx2mqEqzoATPloZ4y7C5kju03oiN4A/exec";
 
 export default function App() {
   const [allTasks, setAllTasks] = useState([]);
   const [rosterList, setRosterList] = useState([]);
   const [studentStats, setStudentStats] = useState(null);
   
-  // Navigation & Session States (Condensed 4-Tab Menu)
+  // Navigation & Session States
   const [activeTab, setActiveTab] = useState('Tasks'); // 'Tasks', 'Practical', 'Missing', 'Portal'
   const [selectedTask, setSelectedTask] = useState(null);
   const [studentName, setStudentName] = useState('');
@@ -26,10 +26,9 @@ export default function App() {
 
   // Submission States
   const [selectedOption, setSelectedOption] = useState(null);
+  const [selectedIndexes, setSelectedIndexes] = useState({});
   const [textSubmission, setTextSubmission] = useState('');
   const [groupMembers, setGroupMembers] = useState('');
-  const [subMode, setSubMode] = useState('file'); // 'file' or 'link'
-  const [fileData, setFileData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const tg = window.Telegram?.WebApp;
@@ -67,23 +66,19 @@ export default function App() {
     fetchTasksAndStats();
   }, [isNameSet]);
 
-  const handleSubmit = () => {
+  const handleSubmit = (finalScoreOverride = null, customSubmissionText = null) => {
     if (!selectedTask) return;
     setLoading(true);
 
     const isQuiz = selectedTask.type.toLowerCase().includes('quiz');
-    const isCorrect = selectedOption === selectedTask.correctIndex;
-    const score = isQuiz ? (isCorrect ? 100 : 0) : null;
+    const score = finalScoreOverride !== null ? finalScoreOverride : null;
     
-    let submissionVal = textSubmission;
+    let submissionVal = customSubmissionText !== null ? customSubmissionText : textSubmission;
     if (isQuiz) {
-      submissionVal = `Selected Option Index: ${selectedOption}`;
+      submissionVal = `Quiz Score Achieved: ${finalScoreOverride}%`;
     } else {
       if (groupMembers.trim()) {
         submissionVal = `${submissionVal} [Group Members: ${groupMembers.trim()}]`;
-      }
-      if (subMode === 'file' && fileData) {
-        submissionVal = `Uploaded File: ${fileData.fileName}`;
       }
     }
 
@@ -93,10 +88,7 @@ export default function App() {
       taskId: selectedTask.taskId,
       taskType: selectedTask.type,
       submission: submissionVal,
-      score: score,
-      fileBase64: fileData ? fileData.fileBase64 : null,
-      fileName: fileData ? fileData.fileName : null,
-      mimeType: fileData ? fileData.mimeType : null
+      score: score
     };
 
     fetch(API_URL, {
@@ -108,8 +100,8 @@ export default function App() {
       .then(() => {
         setTextSubmission('');
         setGroupMembers('');
-        setFileData(null);
         setSelectedOption(null);
+        setSelectedIndexes({});
         setSelectedTask(null);
         fetchTasksAndStats(studentName);
       })
@@ -185,8 +177,8 @@ export default function App() {
               className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold outline-none"
             >
               <option value="12">All Grade 12 Sections</option>
+              <option value="A">Section 12-A</option>
               <option value="B">Section 12-B</option>
-              <option value="C">Section 12-C</option>
             </select>
           </div>
 
@@ -277,7 +269,7 @@ export default function App() {
     );
   }
 
-  // 2. Student Login Onboarding with Modern Aesthetic
+  // 2. Student Login Onboarding
   if (!isNameSet) {
     const filteredRoster = searchQuery.trim() === '' ? [] : rosterList.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
     
@@ -286,7 +278,7 @@ export default function App() {
 
     const handleTeacherAccess = () => {
       const pin = prompt("Enter Teacher Security PIN:");
-      if (pin === "1234") { // Replace "1234" with your secret PIN
+      if (pin === "1234") {
         setIsTeacherMode(true);
       } else if (pin !== null) {
         alert("Incorrect PIN. Access denied.");
@@ -368,12 +360,14 @@ export default function App() {
     );
   }
 
-  // 3. Selected Task Detail View
+  // 3. Selected Task Detail View (Link & Multi-Question Quiz Support Only)
   if (selectedTask) {
     const isQuiz = selectedTask.type.toLowerCase().includes('quiz');
+    
+    // Check readiness
     const isReadyToSubmit = isQuiz 
-      ? selectedOption !== null 
-      : (subMode === 'file' ? fileData !== null : textSubmission.trim().length > 0);
+      ? Object.keys(selectedIndexes).length > 0 
+      : textSubmission.trim().length > 0;
 
     return (
       <div className="min-h-screen bg-slate-100 p-4 max-w-lg mx-auto font-sans">
@@ -401,105 +395,98 @@ export default function App() {
               <span>✓</span> <span>Task Completed & Submitted</span>
             </div>
           ) : isQuiz ? (
-            <div className="space-y-2.5">
-              {selectedTask.options.map((opt, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setSelectedOption(idx)}
-                  className={`w-full p-3.5 text-left rounded-2xl border-2 text-xs transition-all ${
-                    selectedOption === idx 
-                      ? 'border-indigo-600 bg-indigo-50/60 font-bold text-indigo-900 shadow-sm' 
-                      : 'border-slate-100 bg-slate-50/50 text-slate-700 hover:border-slate-200'
-                  }`}
-                >
-                  <span className="font-extrabold mr-2 text-indigo-600">{String.fromCharCode(65 + idx)}.</span> {opt}
-                </button>
-              ))}
+            <div className="space-y-4">
+              {(() => {
+                let questionsList = [];
+                try {
+                  questionsList = JSON.parse(selectedTask.options);
+                } catch (e) {
+                  questionsList = [{ q: selectedTask.prompt, opts: selectedTask.options, ans: selectedTask.correctIndex }];
+                }
+
+                return questionsList.map((item, qIndex) => (
+                  <div key={qIndex} className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                    <p className="text-xs font-extrabold text-slate-800 mb-2">
+                      {qIndex + 1}. {item.q}
+                    </p>
+                    <div className="space-y-2">
+                      {item.opts.map((opt, oIndex) => (
+                        <button
+                          key={oIndex}
+                          onClick={() => {
+                            setSelectedIndexes(prev => ({ ...prev, [qIndex]: oIndex }));
+                          }}
+                          className={`w-full p-3 text-left rounded-xl border text-xs transition-all ${
+                            selectedIndexes[qIndex] === oIndex 
+                              ? 'border-indigo-600 bg-indigo-50 font-bold text-indigo-900 shadow-sm' 
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          <span className="font-extrabold mr-2 text-indigo-600">{String.fromCharCode(65 + oIndex)}.</span> {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ));
+              })()}
+
               <button 
                 disabled={!isReadyToSubmit} 
-                onClick={handleSubmit} 
-                className="w-full mt-4 py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold rounded-2xl disabled:opacity-40 shadow-md text-xs active:scale-[0.98] transition-all"
+                onClick={() => {
+                  let questionsList = [];
+                  try {
+                    questionsList = JSON.parse(selectedTask.options);
+                  } catch (e) {
+                    questionsList = [{ q: selectedTask.prompt, opts: selectedTask.options, ans: selectedTask.correctIndex }];
+                  }
+
+                  let correctCount = 0;
+                  questionsList.forEach((item, idx) => {
+                    if (selectedIndexes[idx] === item.ans) {
+                      correctCount++;
+                    }
+                  });
+
+                  const finalScorePercent = Math.round((correctCount / questionsList.length) * 100);
+                  handleSubmit(finalScorePercent);
+                }} 
+                className="w-full mt-4 py-3.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold rounded-2xl disabled:opacity-40 text-xs shadow-md active:scale-[0.98] transition-all"
               >
-                Submit Quiz Response ✨
+                Submit All Quiz Answers ✨
               </button>
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Dual Mode Submission Switcher */}
-              <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
-                <button
-                  onClick={() => { setSubMode('file'); setTextSubmission(''); }}
-                  className={`flex-1 py-2 rounded-lg transition-all ${subMode === 'file' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
-                >
-                  📁 Upload File
-                </button>
-                <button
-                  onClick={() => { setSubMode('link'); setFileData(null); }}
-                  className={`flex-1 py-2 rounded-lg transition-all ${subMode === 'link' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
-                >
-                  🔗 Submit Link
-                </button>
-              </div>
-
-              {subMode === 'file' ? (
-                <div className="border-2 border-dashed border-slate-200 p-6 rounded-2xl text-center bg-slate-50/50 hover:bg-slate-50 transition-colors">
-                  <input
-                    type="file"
-                    accept="image/png, image/jpeg, .pdf"
-                    onChange={(e) => {
-                      const file = e.target.files[0];
-                      if (!file) return;
-                      if (file.size > 5 * 1024 * 1024) {
-                        alert("File exceeds 5MB limit. Please use the 'Submit Link' option.");
-                        return;
-                      }
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setFileData({ fileName: file.name, mimeType: file.type, fileBase64: reader.result });
-                      };
-                      reader.readAsDataURL(file);
-                    }}
-                    className="text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Project Link (GitHub / Vercel / Imgur Link):</label>
+                  <textarea
+                    rows="3"
+                    value={textSubmission}
+                    onChange={(e) => setTextSubmission(e.target.value)}
+                    placeholder="https://github.com/... or https://vercel.app/..."
+                    className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 font-medium"
                   />
-                  <p className="text-[10px] text-slate-400 mt-2">Max file size: 5MB (PNG, JPG, PDF)</p>
-                  {fileData && (
-                    <div className="mt-3 p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold">
-                      ✓ Ready: {fileData.fileName}
-                    </div>
-                  )}
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Project Link (GitHub / Vercel / Live URL):</label>
-                    <textarea
-                      rows="3"
-                      value={textSubmission}
-                      onChange={(e) => setTextSubmission(e.target.value)}
-                      placeholder="https://github.com/... or https://vercel.app/..."
-                      className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 font-medium"
-                    />
-                  </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">Group Teammates (If group project):</label>
-                    <input
-                      type="text"
-                      value={groupMembers}
-                      onChange={(e) => setGroupMembers(e.target.value)}
-                      placeholder="e.g. Chaltu Lemma, Dawit Bekele"
-                      className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 font-medium"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Group Teammates (If group project):</label>
+                  <input
+                    type="text"
+                    value={groupMembers}
+                    onChange={(e) => setGroupMembers(e.target.value)}
+                    placeholder="e.g. Chaltu Lemma, Dawit Bekele"
+                    className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 font-medium"
+                  />
                 </div>
-              )}
+              </div>
 
               <button 
                 disabled={!isReadyToSubmit} 
-                onClick={handleSubmit} 
+                onClick={() => handleSubmit(null, null)} 
                 className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-2xl disabled:opacity-40 text-xs shadow-md active:scale-[0.98] transition-all"
               >
-                Submit Project 🚀
+                Submit Project Link 🚀
               </button>
             </div>
           )}
@@ -516,13 +503,18 @@ export default function App() {
     { key: 'Portal', label: '🎓 Gradebook' }
   ];
 
-  // Filtering Logic
-  const filteredTasks = allTasks.filter(t => {
-    if (activeTab === 'Tasks') return true;
-    if (activeTab === 'Practical') return t.type.toLowerCase().includes('practical');
-    if (activeTab === 'Missing') return t.status === 'MISSING';
-    return true;
-  });
+  // Filtering Logic & Better Sorting Order:
+  // Order priority: PENDING first, then MISSING, then COMPLETED at the bottom
+  const statusOrder = { "PENDING": 1, "MISSING": 2, "COMPLETED": 3 };
+
+  const filteredTasks = allTasks
+    .filter(t => {
+      if (activeTab === 'Tasks') return true;
+      if (activeTab === 'Practical') return t.type.toLowerCase().includes('practical');
+      if (activeTab === 'Missing') return t.status === 'MISSING';
+      return true;
+    })
+    .sort((a, b) => (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99));
 
   // 4. Main Student Dashboard View
   return (
