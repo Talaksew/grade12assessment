@@ -535,11 +535,7 @@ export default function App() {
             </button>
           </div>
 
-          { /*<div className="text-right bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/10">
-            <span className="text-[9px] uppercase font-extrabold text-indigo-200 block">Overall Score</span>
-            <span className="text-lg font-black text-emerald-400">{studentStats?.totalScore || 0}%</span>
-          </div>
-        </div> */}
+
       </div>
 
       {/* Modern Pill Navigation Tabs */}
