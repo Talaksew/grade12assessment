@@ -28,7 +28,7 @@ export default function App() {
   const [selectedOption, setSelectedOption] = useState(null);
   const [selectedIndexes, setSelectedIndexes] = useState({});
   const [textSubmission, setTextSubmission] = useState('');
-  const [groupMembers, setGroupMembers] = useState('');
+  const [selectedGroupPeers, setSelectedGroupPeers] = useState([]); // Typo-free group member checkboxes
   const [loading, setLoading] = useState(true);
 
   const tg = window.Telegram?.WebApp;
@@ -74,11 +74,15 @@ export default function App() {
     const score = finalScoreOverride !== null ? finalScoreOverride : null;
     
     let submissionVal = customSubmissionText !== null ? customSubmissionText : textSubmission;
+    let groupMembersArr = [];
+
     if (isQuiz) {
       submissionVal = `Quiz Score Achieved: ${finalScoreOverride}%`;
     } else {
-      if (groupMembers.trim()) {
-        submissionVal = `${submissionVal} [Group Members: ${groupMembers.trim()}]`;
+      // Build clean group members array ensuring current student + selected peers
+      if (selectedGroupPeers.length > 0) {
+        groupMembersArr = Array.from(new Set([studentName, ...selectedGroupPeers]));
+        submissionVal = `${submissionVal} [Group Members: ${groupMembersArr.join(', ')}]`;
       }
     }
 
@@ -88,7 +92,8 @@ export default function App() {
       taskId: selectedTask.taskId,
       taskType: selectedTask.type,
       submission: submissionVal,
-      score: score
+      score: score,
+      groupMembers: groupMembersArr.length > 0 ? groupMembersArr : null
     };
 
     fetch(API_URL, {
@@ -99,7 +104,7 @@ export default function App() {
     })
       .then(() => {
         setTextSubmission('');
-        setGroupMembers('');
+        setSelectedGroupPeers([]);
         setSelectedOption(null);
         setSelectedIndexes({});
         setSelectedTask(null);
@@ -360,7 +365,7 @@ export default function App() {
     );
   }
 
-  // 3. Selected Task Detail View (Link & Multi-Question JSON Quiz Support)
+  // 3. Selected Task Detail View
   if (selectedTask) {
     const isQuiz = selectedTask.type.toLowerCase().includes('quiz');
     
@@ -372,7 +377,7 @@ export default function App() {
 
     return (
       <div className="min-h-screen bg-slate-100 p-4 max-w-lg mx-auto font-sans">
-        <button onClick={() => { setSelectedTask(null); setSelectedOption(null); setSelectedIndexes({}); }} className="text-xs text-indigo-600 font-bold mb-3 flex items-center space-x-1">
+        <button onClick={() => { setSelectedTask(null); setSelectedOption(null); setSelectedIndexes({}); setSelectedGroupPeers([]); }} className="text-xs text-indigo-600 font-bold mb-3 flex items-center space-x-1">
           <span>←</span> <span>Back to Dashboard</span>
         </button>
         
@@ -470,14 +475,28 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Group Teammates (If group project):</label>
-                  <input
-                    type="text"
-                    value={groupMembers}
-                    onChange={(e) => setGroupMembers(e.target.value)}
-                    placeholder="e.g. Chaltu Lemma, Dawit Bekele"
-                    className="w-full p-3 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-600 font-medium"
-                  />
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Select Group Teammates (Optional):</label>
+                  <div className="max-h-40 overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1 bg-slate-50">
+                    {rosterList.map((st, idx) => (
+                      st.name !== studentName && (
+                        <label key={idx} className="flex items-center space-x-2.5 p-2 hover:bg-white rounded-lg cursor-pointer transition">
+                          <input
+                            type="checkbox"
+                            checked={selectedGroupPeers.includes(st.name)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedGroupPeers([...selectedGroupPeers, st.name]);
+                              } else {
+                                setSelectedGroupPeers(selectedGroupPeers.filter(name => name !== st.name));
+                              }
+                            }}
+                            className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                          />
+                          <span className="text-xs font-medium text-slate-700">{st.name}</span>
+                        </label>
+                      )
+                    ))}
+                  </div>
                 </div>
               </div>
 
