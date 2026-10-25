@@ -579,7 +579,7 @@ export default function App() {
               <span className="text-base font-extrabold text-indigo-900">{studentStats?.homeworkAvg}%</span>
             </div>            
             <div className="bg-blue-50/80 p-3 rounded-2xl border border-blue-100">
-              <span className="block text-[9px] text-blue-600 font-extrabold">Quiz (20%)</span>
+              <span className="block text-[9px] text-blue-600 font-extrabold">Test (20%)</span>
               <span className="text-base font-extrabold text-blue-900">{studentStats?.quizAvg}%</span>
             </div>
             <div className="bg-emerald-50/80 p-3 rounded-2xl border border-emerald-100">
