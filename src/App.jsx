@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 // REPLACE WITH YOUR PUBLISHED GOOGLE APPS SCRIPT WEB APP EXEC URL
-const API_URL = "https://script.google.com/macros/s/AKfycbzO0T39kwukshoPzZyHAW9Ympt8Vp4MjhcDXFs183nd9kcZ9dK4f7KfRijwHUlqD910cQ/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyH7i_m-wG62ir3xLvQLqH7TDH98OO6bM6cCh4Tx7OuxayGEUJUNEb8MeZSKM1yh_wFGQ/exec";
 
 export default function App() {
   const [allTasks, setAllTasks] = useState([]);
@@ -177,8 +177,8 @@ export default function App() {
               className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold outline-none"
             >
               <option value="12">All Grade 12 Sections</option>
-              <option value="A">Section 12-A</option>
               <option value="B">Section 12-B</option>
+              <option value="C">Section 12-C</option>
             </select>
           </div>
 
@@ -571,28 +571,36 @@ export default function App() {
 
           <div className="grid grid-cols-3 gap-2.5 text-center">
             <div className="bg-blue-50/80 p-3 rounded-2xl border border-blue-100">
-              <span className="block text-[9px] text-blue-600 font-extrabold">Quiz (15%)</span>
-              <span className="text-base font-extrabold text-blue-900">{studentStats?.quizAvg}%</span>
+              <span className="block text-[9px] text-blue-600 font-extrabold">ClassWork (5%)</span>
+              <span className="text-base font-extrabold text-blue-900">{studentStats?.classworkAvg}%</span>
             </div>
             <div className="bg-indigo-50/80 p-3 rounded-2xl border border-indigo-100">
-              <span className="block text-[9px] text-indigo-600 font-extrabold">ClassWork (10%)</span>
-              <span className="text-base font-extrabold text-indigo-900">{studentStats?.classworkAvg}%</span>
+              <span className="block text-[9px] text-indigo-600 font-extrabold">HomeWork (5%)</span>
+              <span className="text-base font-extrabold text-indigo-900">{studentStats?.homeworkAvg}%</span>
+            </div>            
+            <div className="bg-blue-50/80 p-3 rounded-2xl border border-blue-100">
+              <span className="block text-[9px] text-blue-600 font-extrabold">Quiz (20%)</span>
+              <span className="text-base font-extrabold text-blue-900">{studentStats?.quizAvg}%</span>
             </div>
             <div className="bg-emerald-50/80 p-3 rounded-2xl border border-emerald-100">
-              <span className="block text-[9px] text-emerald-600 font-extrabold">Practical (25%)</span>
+              <span className="block text-[9px] text-emerald-600 font-extrabold">Practical (20%)</span>
               <span className="text-base font-extrabold text-emerald-900">{studentStats?.practicalAvg}%</span>
             </div>
             <div className="bg-purple-50/80 p-3 rounded-2xl border border-purple-100">
-              <span className="block text-[9px] text-purple-600 font-extrabold">Exam (30%)</span>
-              <span className="text-base font-extrabold text-purple-900">{studentStats?.examAvg}%</span>
+              <span className="block text-[9px] text-purple-600 font-extrabold">Lab Ind. Exam (10%)</span>
+              <span className="text-base font-extrabold text-purple-900">{studentStats?.labIndvExamAvg}%</span>
+            </div>
+            <div className="bg-purple-50/80 p-3 rounded-2xl border border-purple-100">
+              <span className="block text-[9px] text-purple-600 font-extrabold">Lab Gru. Exam (10%)</span>
+              <span className="text-base font-extrabold text-purple-900">{studentStats?.labGruExamAvg}%</span>
             </div>
             <div className="bg-amber-50/80 p-3 rounded-2xl border border-amber-100">
-              <span className="block text-[9px] text-amber-600 font-extrabold">Assign (15%)</span>
-              <span className="text-base font-extrabold text-amber-900">{studentStats?.assignmentAvg}%</span>
+              <span className="block text-[9px] text-amber-600 font-extrabold">Project (20%)</span>
+              <span className="text-base font-extrabold text-amber-900">{studentStats?.project}%</span>
             </div>
             <div className="bg-rose-50/80 p-3 rounded-2xl border border-rose-100">
-              <span className="block text-[9px] text-rose-600 font-extrabold">Homework (5%)</span>
-              <span className="text-base font-extrabold text-rose-900">{studentStats?.homeworkAvg}%</span>
+              <span className="block text-[9px] text-rose-600 font-extrabold">Ex. Book (10%)</span>
+              <span className="text-base font-extrabold text-rose-900">{studentStats?.exBook}%</span>
             </div>
           </div>
         </div>
